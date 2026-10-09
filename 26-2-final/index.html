@@ -184,7 +184,7 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .toast.bad { background: var(--bad); color: var(--accent-ink); }
 @media (max-width: 520px) {
   .fl-row { grid-template-columns: 2.4em minmax(0, 1fr); }
-  .fl-row .seg { grid-column: 1 / -1; justify-self: end; }
+  .fl-row .seg, .fl-row .qbtn { grid-column: 1 / -1; justify-self: end; }
   .qrow { grid-template-columns: 3.5em 1fr; } .qrow span:last-child { grid-column: 1 / -1; }
   .abar-r { margin-left: 0; }
 }
@@ -204,6 +204,13 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .seg button.on.gB { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 .seg button.on.gF { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .dateinp { width: auto !important; }
+.ck-extra { flex: 1 1 220px; max-width: 360px; padding: 6px 10px !important; font-size: 0.88rem; }
+.bar-t { position: relative; }
+.bar-t .avg { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); transform: translateX(-1px); }
+.bar-l em { font-style: normal; font-size: 0.74rem; color: var(--muted); }
+.bar-l em.worse { color: var(--bad); } .bar-l em.better { color: var(--ok); }
+.qbtn { border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 4px; padding: 7px 12px; cursor: pointer; white-space: nowrap; font-size: 0.9rem; }
+.qbtn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .steps { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
 .btn.bm { text-decoration: none; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); cursor: grab; }
 .ck-bar .ck-search { flex: 1; max-width: 420px; font-size: 1.1rem; padding: 12px 14px; }
@@ -355,7 +362,30 @@ var CORE_ACTIONS = {
     });
     var items = {};
     mySubs.forEach(function (s) { items[s.setId] = im[s.setId] || []; });
-    return { ok: true, me: publicStudent(st), sets: outSets, history: history, items: items };
+    // 같은 학교 재원생 기준 등수와 반 평균
+    var mates = {}; store.students().forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
+    var setIds = {}; sets.forEach(function (s) { setIds[s.id] = 1; });
+    var bySetScores = {}, totals = {}, classType = {};
+    store.subs().forEach(function (sb) {
+      if (!mates[sb.studentId] || !setIds[sb.setId]) return;
+      var its = im[sb.setId] || [], n = its.length;
+      var x = Object.keys(sb.marks).filter(function (k) { return sb.marks[k] === 'X'; }).length;
+      (bySetScores[sb.setId] || (bySetScores[sb.setId] = [])).push({ id: sb.studentId, v: n ? (n - x) / n : 0 });
+      var t = totals[sb.studentId] || (totals[sb.studentId] = { n: 0, ok: 0 }); t.n += n; t.ok += n - x;
+      its.forEach(function (it) {
+        var m = sb.marks[it.no], miss = m === 'X' || m === 'G' ? 1 : 0;
+        it.types.forEach(function (ty) { var b = classType[ty] || (classType[ty] = { n: 0, miss: 0 }); b.n++; b.miss += miss; });
+      });
+    });
+    function rankOf(list, id) {
+      var me = list.filter(function (o) { return o.id === id; })[0]; if (!me) return null;
+      return { rank: 1 + list.filter(function (o) { return o.v > me.v + 1e-9; }).length, of: list.length };
+    }
+    var setRanks = {}; Object.keys(bySetScores).forEach(function (k) { setRanks[k] = rankOf(bySetScores[k], st.id); });
+    var overallList = Object.keys(totals).map(function (id) { return { id: id, v: totals[id].n ? totals[id].ok / totals[id].n : 0 }; });
+    var classRates = {}; Object.keys(classType).forEach(function (k) { classRates[k] = classType[k].n ? classType[k].miss / classType[k].n : 0; });
+    return { ok: true, me: publicStudent(st), sets: outSets, history: history, items: items,
+      ranks: { sets: setRanks, overall: rankOf(overallList, st.id), mates: Object.keys(mates).length }, classRates: classRates };
   },
 
   getSet: function (req, store, env) {
@@ -482,7 +512,7 @@ var CORE_ACTIONS = {
       if (!ids[r.studentId]) return;
       var g = {};
       (set.homework || []).forEach(function (h) { var v = r.grades && r.grades[h]; if (['A', 'B', 'F'].indexOf(v) >= 0) g[h] = v; });
-      var c = { setId: set.id, studentId: r.studentId, checkedAt: env.now(), grades: g };
+      var c = { setId: set.id, studentId: r.studentId, checkedAt: env.now(), grades: g, extra: String(r.extra || '').slice(0, 200) };
       store.putCheck(c); saved.push(c);
     });
     return { ok: true, saved: saved };
@@ -655,8 +685,15 @@ function loadHome() {
     HOME = r; S.me = r.me; setView('home');
   });
 }
+function myBar(label, b, classRate, sub) {
+  var r = rate(b), few = b.n < 5, cr = classRate === undefined ? null : classRate;
+  var diff = cr === null ? '' : (r - cr >= 0.05 ? '<em class="worse">학교 평균보다 ' + Math.round((r - cr) * 100) + '%p 높음</em>' : r - cr <= -0.05 ? '<em class="better">학교 평균보다 낮음</em>' : '<em>학교 평균과 비슷</em>');
+  return '<div class="bar' + (few ? ' few' : '') + '"><div class="bar-l"><span>' + h(label) + '</span>' + (sub ? '<small>' + h(sub) + '</small>' : '') + diff + '</div>' +
+    '<div class="bar-t"><i style="width:' + Math.max(2, r * 100) + '%"></i>' + (cr === null ? '' : '<b class="avg" style="left:' + (cr * 100) + '%" title="학교 평균 ' + pct(cr) + '"></b>') + '</div>' +
+    '<div class="bar-v">' + pct(r) + '<small>' + (b.x + b.g) + '/' + b.n + '</small></div></div>';
+}
 function viewHome() {
-  var me = HOME.me, sets = HOME.sets;
+  var me = HOME.me, sets = HOME.sets, rk = HOME.ranks || {}, cls = HOME.classRates || {};
   var open = sets.filter(function (s) { return s.open; }), closed = sets.filter(function (s) { return !s.open; });
   var entries = HOME.history.map(function (x) { return { items: HOME.items[x.setId] || [], marks: x.marks, setId: x.setId }; });
   var st = calc(entries);
@@ -664,22 +701,27 @@ function viewHome() {
   html += '<section class="block"><h2>이번 주</h2>';
   if (!open.length) html += '<p class="empty">지금 제출할 수 있는 클리닉이 없습니다.</p>';
   html += '<div class="cards">' + open.map(function (s) {
+    var r = rk.sets && rk.sets[s.id];
     return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '"><span class="card-k">' + h(s.week) + '</span><strong>' + h(s.title) + '</strong>' +
-      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? '제출 완료 · ' + s.score + '/' + s.total + ' (수정 가능)' : '미제출 · ' + s.total + '문항') + '</span></button>';
+      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? '제출 완료 · ' + s.score + '/' + s.total + (r ? ' · ' + r.of + '명 중 ' + r.rank + '등' : '') : '미제출 · ' + s.total + '문항') + '</span></button>';
   }).join('') + '</div></section>';
 
-  html += '<section class="block"><h2>내 약점</h2>';
-  if (!entries.length) html += '<p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 여기에 약점 분석이 나타납니다.</p>';
-  else {
-    var tr = sortedRates(st.type, 3).slice(0, 6), wr = sortedRates(st.work, 3).slice(0, 6);
-    html += '<p class="note">틀린 문제와 찍어서 맞힌 문제를 합쳐서 계산합니다. 지금까지 ' + entries.length + '회, ' + st.total.n + '문항을 풀었습니다.</p>' +
-      '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return barRow(TYPES[o.key] || o.key, o.b, areaOfType(o.key)); }).join('') + '</div>' +
-      '<div><h3>작품</h3>' + wr.map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' + trend(entries) + '</div>';
-  }
-  html += '</section>';
+  if (entries.length) {
+    var ov = rk.overall, acc = st.total.n ? (st.total.n - st.total.x) / st.total.n : 0;
+    html += '<section class="block"><h2>내 위치</h2><div class="kpis">' +
+      '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
+      '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (ov ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : '–') + '</strong></div>' +
+      '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · ' + st.total.n + '문항</small></strong></div></div>' +
+      '<p class="note">등수는 같은 학교 재원생 중 클리닉을 제출한 학생끼리 정답률로 매깁니다. 찍어서 맞힌 문제는 정답으로 칩니다.</p>' + trend(entries) + '</section>';
+    var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
+    html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다. 막대 위 세로선은 우리 학교 평균이에요.</p>' +
+      '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return myBar(TYPES[o.key] || o.key, o.b, cls[o.key], areaOfType(o.key)); }).join('') + '</div>' +
+      '<div><h3>작품</h3>' + wr.map(function (o) { return myBar(o.key, o.b); }).join('') + '</div></div></section>';
+  } else html += '<section class="block"><h2>내 위치</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 등수와 자주 틀리는 곳이 여기에 나타납니다.</p></section>';
   if (closed.length) {
     html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
-      return '<div class="row"><span>' + h(s.week) + '</span><span>' + h(s.title) + '</span><span class="num">' + (s.submitted ? s.score + '/' + s.total : '미제출') + '</span></div>';
+      var r = rk.sets && rk.sets[s.id];
+      return '<div class="row"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (r ? r.of + '명 중 ' + r.rank + '등' : '') : '') + '</span><span class="num">' + (s.submitted ? s.score + '/' + s.total : '미제출') + '</span></div>';
     }).join('') + '</div></section>';
   }
   return html + '</main>';
@@ -710,7 +752,7 @@ function openSet(id) {
     if (!r.ok) return toast(r.error, true);
     var sub = r.sub;
     F = { set: r.set, items: r.items, marks: sub ? Object.assign({}, sub.marks) : {}, follow: sub ? Object.assign({}, sub.follow) : {},
-      check: r.check, achieve: sub ? sub.achieve : '', message: sub ? sub.message : '', resubmit: !!sub, err: '' };
+      check: r.check, resubmit: !!sub, err: '' };
     setView('form');
   });
 }
@@ -736,36 +778,29 @@ function viewForm() {
     }).join('') + '</div><div class="tally"><span>맞힌 개수</span><strong class="num">' + c.ok + ' / ' + F.items.length + '</strong><span class="tally-g">찍맞 ' + c.g + '</span></div></section>';
 
   var flagged = F.items.filter(function (it) { return F.marks[it.no]; });
-  html += '<section class="sheet"><h2>틀린 문제 정리</h2>';
-  if (!flagged.length) html += '<p class="empty">틀린 문제가 없습니다. 다음으로 넘어가세요.</p>';
-  else html += '<p class="note">문제마다 이해했는지, 질문할 것인지 골라 주세요. 모두 골라야 제출할 수 있습니다.</p><div class="fl">' + flagged.map(function (it) {
-    var f = F.follow[it.no] || '';
-    return '<div class="fl-row"><span class="fl-no ' + (F.marks[it.no] === 'G' ? 'g' : 'x') + '">' + it.no + '</span><span class="fl-meta">' + h(it.work) + '<small>' + it.types.map(function (t) { return h(TYPES[t] || t); }).join(' · ') + '</small></span>' +
-      '<div class="seg"><button type="button" class="' + (f === 'U' ? 'on done' : '') + '" data-act="follow" data-no="' + it.no + '" data-v="U">이해했어요</button>' +
-      '<button type="button" class="' + (f === 'Q' ? 'on q' : '') + '" data-act="follow" data-no="' + it.no + '" data-v="Q">질문할게요</button></div></div>';
-  }).join('') + '</div>';
-  html += '</section>';
-
-  html += '<section class="sheet"><h2>성취도</h2><p class="note">이번 주 자신의 성취도를 스스로 평가해 주세요.</p><div class="seg wide">' + ['상', '중', '하'].map(function (v) {
-    return '<button type="button" class="' + (F.achieve === v ? 'on done' : '') + '" data-act="achieve" data-v="' + v + '">' + v + '</button>';
-  }).join('') + '</div></section>';
-  html += '<section class="sheet"><h2>더 궁금한 내용 / 하고 싶은 말</h2><textarea id="in-msg" rows="4" maxlength="1000" placeholder="없으면 비워 두어도 됩니다">' + h(F.message) + '</textarea></section>';
+  if (flagged.length) {
+    html += '<section class="sheet"><h2>질문할 문제</h2><p class="note">선생님께 질문하고 싶은 문제만 눌러 주세요. 없으면 그냥 제출하면 됩니다.</p><div class="fl">' + flagged.map(function (it) {
+      var on = F.follow[it.no] === 'Q';
+      return '<div class="fl-row"><span class="fl-no ' + (F.marks[it.no] === 'G' ? 'g' : 'x') + '">' + it.no + '</span><span class="fl-meta">' + h(it.work) + '<small>' + it.types.map(function (t) { return h(TYPES[t] || t); }).join(' · ') + '</small></span>' +
+        '<button type="button" class="qbtn' + (on ? ' on' : '') + '" data-act="qtoggle" data-no="' + it.no + '" aria-pressed="' + on + '">' + (on ? '질문할게요 ✓' : '질문할게요') + '</button></div>';
+    }).join('') + '</div></section>';
+  }
   html += (F.err ? '<p class="err">' + h(F.err) + '</p>' : '') +
     '<div class="actions"><button class="btn" type="button" data-act="home">돌아가기</button><button class="btn primary" type="submit">' + (F.resubmit ? '다시 제출' : '제출') + '</button></div></form></main>';
   return html;
 }
 function viewDone() {
-  var r = F.result, entries = [{ items: F.items, marks: F.marks }], st = calc(entries);
+  var r = F.result, st = calc([{ items: F.items, marks: F.marks }]);
   var top = sortedRates(st.type, 2).filter(function (o) { return o.r > 0; }).slice(0, 3);
   var q = Object.keys(F.follow).filter(function (k) { return F.follow[k] === 'Q'; });
   return '<main class="narrow">' + masthead('제출이 완료되었습니다.') + '<div class="sheet stack"><div class="big num">' + r.score + '<small> / ' + r.total + '</small></div>' +
     (top.length ? '<h3>이번 주 많이 틀린 유형</h3>' + top.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '<p class="note">이번 주에는 특별히 약한 유형이 없습니다.</p>') +
     (q.length ? '<p class="note">질문할 문제: ' + q.join(', ') + '번. 클리닉 시간에 질문해 주세요.</p>' : '') +
-    '<button class="btn primary" data-act="home">처음으로</button></div></main>';
+    '<button class="btn primary" data-act="home">내 위치 보러 가기</button></div></main>';
 }
 
 /* ---------- 선생님 ---------- */
-var A = { notes: {}, exam: store_get('exam') || '기말고사', addWeak: false, tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
+var A = { extras: {}, notes: {}, exam: store_get('exam') || '기말고사', addWeak: false, tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
 function viewAdminLogin() {
   return '<main class="narrow">' + masthead('선생님 로그인') + '<form novalidate class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
     '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: 123456</p>' : '') +
@@ -780,7 +815,7 @@ function loadAdmin() {
 }
 function applyAdmin(r) {
   {
-    A.data = r; A.grades = {}; r.checks = r.checks || [];
+    A.data = r; A.grades = {}; A.extras = {}; r.checks = r.checks || [];
     var d = r;
     d.stuById = {}; d.students.forEach(function (s) { d.stuById[s.id] = s; });
     d.setById = {}; d.sets.forEach(function (s) { d.setById[s.id] = s; });
@@ -865,12 +900,12 @@ function tabWeek() {
   }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
 
   // 학생별
-  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th><th class="r">찍맞</th><th class="r">질문</th><th>성취도</th><th>하고 싶은 말</th><th>제출</th></tr></thead><tbody>' +
+  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th><th class="r">찍맞</th><th class="r">질문</th><th>성취도 (선생님)</th><th>제출</th></tr></thead><tbody>' +
     subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
       Object.keys(s.follow).forEach(function (k) { if (s.follow[k] === 'Q') q++; });
-      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td><td class="r num">' + g + '</td><td class="r num">' + q + '</td><td>' + h(s.achieve) + '</td><td class="msg">' + h(s.message) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td></tr>';
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td><td class="r num">' + g + '</td><td class="r num">' + q + '</td><td class="msg">' + h(extraOf(set.id, s.studentId)) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td></tr>';
     }).join('') + '</tbody></table></div></section>';
   return html;
 }
@@ -951,11 +986,11 @@ function studentModal(id) {
     var x = 0, g = 0, q = [];
     Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; else g++; });
     Object.keys(sub.follow).forEach(function (k) { if (sub.follow[k] === 'Q') q.push(k); });
-    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + '</td><td class="r num">' + g + '</td><td class="num">' + (q.join(', ') || '–') + '</td><td class="msg">' + h(sub.message) + '</td></tr>';
+    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + '</td><td class="r num">' + g + '</td><td class="num">' + (q.join(', ') || '–') + '</td><td class="msg">' + h(extraOf(set.id, id)) + '</td></tr>';
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
-    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th><th class="r">찍맞</th><th>질문</th><th>하고 싶은 말</th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th><th class="r">찍맞</th><th>질문</th><th>성취도</th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
     (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
       '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
     '</div></div>';
@@ -1010,6 +1045,11 @@ function tabCheck() {
   html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
   return html;
 }
+function extraOf(setId, sid) {
+  var c = (A.data.checks || []).filter(function (x) { return x.setId === setId && x.studentId === sid; })[0];
+  var e = A.extras[setId + ':' + sid];
+  return e !== undefined ? e : (c && c.extra) || '';
+}
 function ckRowHtml(st, set) {
   var r = { st: st, set: set };
     var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
@@ -1019,7 +1059,8 @@ function ckRowHtml(st, set) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
         }).join('') + '</div></div>';
-      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없어요.</span>') + '</div></div>';
+      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없어요.</span>') +
+      '<input class="ck-extra" data-extra="' + set.id + ':' + st.id + '" value="' + h(extraOf(set.id, st.id)) + '" placeholder="성취도 (구두 테스트 등, 있을 때만)" aria-label="' + h(st.name) + ' 성취도"></div></div>';
 }
 function refreshCkRow(setId, sid) {
   var el = document.getElementById('ck-' + setId + '-' + sid), st = A.data.stuById[sid], set = A.data.setById[setId];
@@ -1038,10 +1079,11 @@ function flushChecks() {
     A.dirty[setId] = {};
     var g = gradesFor(setId);
     ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; refreshCkRow(setId, id); });
-    api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {} }; }) }).then(function (r) {
+    api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {}, extra: extraOf(setId, id) }; }) }).then(function (r) {
       ids.forEach(function (id) { A.saving[setId + ':' + id] = r.ok ? 'ok' : 'err'; });
       if (r.ok) {
         r.saved.forEach(function (c) {
+          delete A.extras[c.setId + ':' + c.studentId];
           var i = A.data.checks.findIndex(function (x) { return x.setId === c.setId && x.studentId === c.studentId; });
           if (i >= 0) A.data.checks[i] = c; else A.data.checks.push(c);
         });
@@ -1071,7 +1113,7 @@ function resultRowsForDay(day, school) {
       Object.keys(sub.marks).forEach(function (k2) { if (sub.marks[k2] === 'X') x++; else gg++; });
       Object.keys(sub.follow).forEach(function (k2) { if (sub.follow[k2] === 'Q') q.push(k2); });
     }
-    return { set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks) : [] };
+    return { extra: ck ? (ck.extra || '') : '', set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks) : [] };
   }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
 }
 var MARK = { A: '○', B: '△', F: '✕' };
@@ -1098,6 +1140,7 @@ function smsText(r) {
   if (r.set.homework.length) lines.push('');
   lines.push('■ 확인 암기 테스트 성취도');
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
+  if (r.extra) lines.push('- ' + r.extra);
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
   var note = getNote(r.set).trim();
   if (note) { lines.push(''); lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
@@ -1130,12 +1173,12 @@ function tabToday() {
     '<details><summary>처음 한 번만: "클리닉 결과 넣기" 북마크 만들기</summary>' +
     '<p class="note">웨일·크롬 모두 Ctrl + Shift + B를 누르면 북마크 바가 켜져요. 아래 빨간 버튼을 마우스로 끌어서 북마크 바에 놓으면 끝이에요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "클리닉 결과 넣기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn primary bm" href="' + h(BOOKMARKLET_HREF) + '" onclick="return false">클리닉 결과 넣기</a><button class="btn" data-act="copy-bm">코드 복사</button></div></details></section>';
-  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th><th class="r">찍맞</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
+  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th><th class="r">찍맞</th><th>성취도</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
     rows.map(function (r) {
       return '<tr><td><button class="link" data-act="detail" data-id="' + r.st.id + '">' + h(r.st.name) + '</button></td><td class="muted">' + h(r.st.school + ' · ' + r.set.week) + '</td>' +
         '<td class="num">' + (r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + '">' + (MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
         '<td class="r num">' + (r.sub ? r.score + '/' + r.n : '<span class="badtxt">미제출</span>') + '</td><td class="r num">' + (r.sub ? r.guess : '') + '</td>' +
-        '<td class="muted">' + h(r.weak.join(', ')) + '</td><td class="num">' + h(r.q.join(', ')) + '</td></tr>';
+        '<td>' + h(r.extra) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td><td class="num">' + h(r.q.join(', ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   html += '<div class="smslist">' + rows.map(function (r, i) {
     return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '" data-school="' + h(r.st.school) + '">' + h(smsText(r)) + '</pre></div>';
@@ -1272,8 +1315,7 @@ function onClick(ev) {
   if (F && S.view === 'form') {
     keepMsg();
     if (act === 'mark') { var no = t.dataset.no, m = F.marks[no]; if (!m) F.marks[no] = 'X'; else if (m === 'X') F.marks[no] = 'G'; else { delete F.marks[no]; delete F.follow[no]; } return renderKeep(); }
-    if (act === 'follow') { F.follow[t.dataset.no] = t.dataset.v; return renderKeep(); }
-    if (act === 'achieve') { F.achieve = t.dataset.v; return renderKeep(); }
+    if (act === 'qtoggle') { var qn = t.dataset.no; if (F.follow[qn] === 'Q') delete F.follow[qn]; else F.follow[qn] = 'Q'; return renderKeep(); }
   }
   // 선생님
   if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
@@ -1377,6 +1419,10 @@ function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y);
 
 function onChange(ev) {
   var t = ev.target;
+  if (t.dataset && t.dataset.extra) {
+    var kp = t.dataset.extra.split(':'); A.extras[t.dataset.extra] = t.value.trim();
+    (A.dirty[kp[0]] || (A.dirty[kp[0]] = {}))[kp[1]] = 1; flushChecks(); return;
+  }
   if (t.id === 'sel-ck') { A.ckSet = t.value; return render(); }
   if (t.id === 'sel-exam') { A.exam = t.value; store_set('exam', t.value); refreshSms(); return; }
   if (t.id === 'chk-weak') { A.addWeak = t.checked; refreshSms(); return; }
@@ -1447,11 +1493,8 @@ function onSubmit(ev) {
   else if (f.id === 'f-admin') adminLogin($('#in-apw').value);
   else if (f.id === 'f-sub') {
     keepMsg();
-    var missF = Object.keys(F.marks).filter(function (k) { return !F.follow[k]; });
-    if (missF.length) { F.err = '이해했어요/질문할게요를 고르지 않은 문제: ' + missF.join(', ') + '번'; return renderKeep(); }
-    if (!F.achieve) { F.err = '성취도를 선택해 주세요.'; return renderKeep(); }
     F.err = '';
-    api('submit', { token: S.token, setId: F.set.id, marks: F.marks, follow: F.follow, achieve: F.achieve, message: F.message }).then(function (r) {
+    api('submit', { token: S.token, setId: F.set.id, marks: F.marks, follow: F.follow }).then(function (r) {
       if (!r.ok) { F.err = r.error; return renderKeep(); }
       F.result = r; setView('done');
     });
