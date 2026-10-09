@@ -754,7 +754,7 @@ function viewDone() {
 }
 
 /* ---------- 선생님 ---------- */
-var A = { tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
+var A = { notes: {}, exam: store_get('exam') || '기말고사', addWeak: false, tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
 function viewAdminLogin() {
   return '<main class="narrow">' + masthead('선생님 로그인') + '<form novalidate class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
     '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: 123456</p>' : '') +
@@ -1063,12 +1063,22 @@ function resultRowsForDay(day, school) {
     return { set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks) : [] };
   }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school) || a.st.name.localeCompare(b.st.name); });
 }
+var MARK = { A: '○', B: '△', F: '✕' };
+function fullSchool(sc) { return sc === '경복' ? '경복여고' : /고$/.test(sc) ? sc : sc + '고'; }
+function noteKey(day, school) { return 'note.' + day + '.' + school; }
+function getNote(day, school) { var k = noteKey(day, school); if (A.notes[k] === undefined) A.notes[k] = store_get(k) || ''; return A.notes[k]; }
 function smsText(r) {
-  var lines = ['[진희T 국어] ' + r.st.name + ' 학생 ' + r.set.week + ' 클리닉 결과입니다.'];
-  if (r.set.homework.length) lines.push('■ 숙제: ' + r.set.homework.map(function (hw) { return hw + ' ' + ((r.ck && r.ck.grades[hw]) || '-'); }).join(' / '));
-  lines.push('■ 복습 테스트: ' + (r.sub ? r.score + '/' + r.n + (r.guess ? ' (찍어서 맞힌 문제 ' + r.guess + '개)' : '') : '미제출'));
-  if (r.weak.length) lines.push('■ 보완이 필요한 부분: ' + r.weak.join(', '));
-  if (r.q.length) lines.push('■ 질문한 문제: ' + r.q.join(', ') + '번');
+  var exam = A.exam || '기말고사';
+  var lines = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']', ''];
+  if (r.set.homework.length) {
+    lines.push('■ 과제 수행 여부');
+    r.set.homework.forEach(function (hw) { var g = r.ck && r.ck.grades[hw]; lines.push('- ' + hw + ' : ' + (g ? MARK[g] : '-')); });
+  }
+  lines.push('■ 확인 암기 테스트 성취도');
+  lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
+  if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
+  var note = getNote(A.day, r.st.school).trim();
+  if (note) { lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
   return lines.join('\n');
 }
 function tabToday() {
@@ -1080,8 +1090,16 @@ function tabToday() {
     '<div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
       return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>';
-  html += '<p class="note">이 날짜에 숙제 검사를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 문자 문구는 눌러서 복사한 뒤 학부모 문자에 붙여 넣으면 돼요.</p>';
+  html += '<p class="note">이 날짜에 숙제 검사를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
+  var schoolsToday = Array.from(new Set(rows.map(function (r) { return r.st.school; }))).sort();
+  html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
+    return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
+    '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label></div>' +
+    schoolsToday.map(function (sc) {
+      return '<label for="note-' + h(sc) + '">' + h(fullSchool(sc)) + ' 클리닉 진행 사항 <small class="muted">(이 학교 학생들 문자에 똑같이 들어가요)</small></label>' +
+        '<textarea id="note-' + h(sc) + '" data-note="' + h(sc) + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(A.day, sc)) + '</textarea>';
+    }).join('') + '</section>';
   html += '<div class="actions"><button class="btn" data-act="copy-all">문자 문구 전체 복사</button></div>';
   html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제</th><th class="r">복습 테스트</th><th class="r">찍맞</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
     rows.map(function (r) {
@@ -1091,7 +1109,7 @@ function tabToday() {
         '<td class="muted">' + h(r.weak.join(', ')) + '</td><td class="num">' + h(r.q.join(', ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   html += '<div class="smslist">' + rows.map(function (r, i) {
-    return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '">' + h(smsText(r)) + '</pre></div>';
+    return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '" data-school="' + h(r.st.school) + '">' + h(smsText(r)) + '</pre></div>';
   }).join('') + '</div>';
   return html;
 }
@@ -1326,6 +1344,8 @@ function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y);
 function onChange(ev) {
   var t = ev.target;
   if (t.id === 'sel-ck') { A.ckSet = t.value; return render(); }
+  if (t.id === 'sel-exam') { A.exam = t.value; store_set('exam', t.value); refreshSms(); return; }
+  if (t.id === 'chk-weak') { A.addWeak = t.checked; refreshSms(); return; }
   if (t.id === 'in-day') { A.day = t.value || todayStr(); return render(); }
   if (t.id === 'sel-set') { A.setId = t.value; A.showAllItems = false; A.showAllQ = false; return render(); }
   if (t.dataset && t.dataset.edit && A.edit) {
@@ -1347,7 +1367,14 @@ function applyFilter() {
   var stt = $('#in-q') && root.querySelector('.t tbody');
   if (stt) stt.querySelectorAll('tr[data-name]').forEach(function (r) { r.hidden = !nameMatch(r.dataset.name, A.q); });
 }
+function refreshSms(school) {
+  (A.todayRows || []).forEach(function (r, i) { if (!school || r.st.school === school) { var el = $('#sms-' + i); if (el) el.textContent = smsText(r); } });
+}
 function onInput(ev) {
+  if (ev.target.dataset && ev.target.dataset.note !== undefined) {
+    var sc = ev.target.dataset.note, k = noteKey(A.day, sc);
+    A.notes[k] = ev.target.value; store_set(k, ev.target.value); refreshSms(sc); return;
+  }
   if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
   if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); applyFilter(); return; }
   if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); applyFilter(); return; }
