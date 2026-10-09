@@ -204,6 +204,10 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .seg button.on.gB { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 .seg button.on.gF { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .dateinp { width: auto !important; }
+.ck-bar .ck-search { flex: 1; max-width: 420px; font-size: 1.1rem; padding: 12px 14px; }
+.oktxt { color: var(--ok); }
+.cklist.one .ckrow { padding: 18px 16px; }
+.cklist.one .ck-name strong { font-size: 1.3rem; }
 .smslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .sms { background: var(--sheet); border: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
@@ -905,7 +909,7 @@ function studentSummary(st) {
 }
 function tabStudents() {
   var d = A.data;
-  var list = d.students.filter(function (s) { return (A.school === '전체' || s.school === A.school) && (!A.q || s.name.indexOf(A.q) >= 0); })
+  var list = d.students.filter(function (s) { return (A.school === '전체' || s.school === A.school); })
     .sort(function (a, b) { return (a.status === b.status ? 0 : a.status === 'active' ? -1 : 1) || a.school.localeCompare(b.school) || a.name.localeCompare(b.name); });
   var html = '<section class="block sheet"><h2>학생 추가</h2><p class="note">한 줄에 한 명씩, 이름과 학교를 같이 넣어 주세요. 순서는 상관없고 "동양고"는 "동양"으로 줄여서 저장해요. "김도현(동양)"처럼 괄호를 붙여도 괄호는 빼고 저장되고, 동명이인 구분은 사이트가 알아서 해요. 비밀번호는 0000으로 시작하고, 첫 로그인 때 학생이 바꿔요.</p>' +
     '<textarea id="in-add" rows="4" placeholder="김민준&#9;동양고&#10;김지원&#9;경복여고"></textarea><div class="actions"><button class="btn primary" data-act="add-students">추가</button></div>' +
@@ -916,7 +920,7 @@ function tabStudents() {
   html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교</th><th class="r">제출</th><th class="r">정답률</th><th>약한 유형</th><th>상태</th><th></th></tr></thead><tbody>' +
     list.map(function (s) {
       var sm = studentSummary(s), cf = A.confirm && A.confirm.id === s.id ? A.confirm.op : null;
-      return '<tr class="' + (s.status !== 'active' ? 'dim' : '') + '"><td><button class="link" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button></td><td>' + h(s.school) + '</td><td class="r num">' + sm.n + '</td>' +
+      return '<tr data-name="' + h(s.name) + '" class="' + (s.status !== 'active' ? 'dim' : '') + '"><td><button class="link" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button></td><td>' + h(s.school) + '</td><td class="r num">' + sm.n + '</td>' +
         '<td class="r num">' + (sm.acc === null ? '–' : pct(sm.acc)) + '</td><td class="muted">' + h(sm.weak.join(', ')) + '</td>' +
         '<td>' + (s.status === 'active' ? (s.mustChange ? '<span class="tag">첫 로그인 전</span>' : '') : '<span class="tag">퇴원</span>') + '</td><td class="acts">' +
         '<button class="mini' + (cf === 'reset' ? ' arm' : '') + '" data-act="st-op" data-op="reset" data-id="' + s.id + '">' + (cf === 'reset' ? '한 번 더 누르면 0000' : '비번 초기화') + '</button>' +
@@ -962,30 +966,55 @@ function defaultSetId() {
   var d = A.data, open = d.sets.filter(function (s) { return s.open; });
   return (open[0] || d.sets[0] || {}).id || null;
 }
+var CHO = 'ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ';
+function choseong(str) {
+  return String(str).split('').map(function (ch) { var c = ch.charCodeAt(0) - 0xAC00; return c >= 0 && c <= 11171 ? CHO[Math.floor(c / 588)] : ch; }).join('');
+}
+function nameMatch(name, q) {
+  if (!q) return true;
+  q = q.replace(/\s+/g, '');
+  if (/^[ㄱ-ㅎ]+$/.test(q)) return choseong(name).indexOf(q) >= 0;
+  return name.indexOf(q) >= 0;
+}
+function latestOpenSetBySchool() {
+  var m = {};
+  A.data.sets.forEach(function (s) { if (s.open && !m[s.school]) m[s.school] = s; }); // sets는 최신순 정렬
+  return m;
+}
 function tabCheck() {
   var d = A.data;
-  if (!A.ckSet || !d.setById[A.ckSet]) A.ckSet = defaultSetId();
-  var set = d.setById[A.ckSet];
-  if (!set) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
-  var g = gradesFor(set.id);
-  var list = d.students.filter(function (s) { return s.status === 'active' && s.school === set.school && (!A.ckQ || s.name.indexOf(A.ckQ) >= 0); })
-    .sort(function (a, b) { return a.name.localeCompare(b.name); });
-  var done = list.filter(function (s) { return g[s.id] && Object.keys(g[s.id]).length; }).length;
-  var html = '<div class="toolbar"><label for="sel-ck">세트</label><select id="sel-ck">' + setOptions(set.id) + '</select>' +
-    '<input id="in-ckq" placeholder="이름 검색" value="' + h(A.ckQ) + '"></div>' +
-    '<p class="note">누르면 바로 저장돼요. 같은 칸을 한 번 더 누르면 지워져요. 검사한 학생 ' + done + ' / ' + list.length + '명</p>';
-  if (!set.homework.length) return html + '<p class="empty">이 세트에는 숙제 항목이 없어요. 클리닉 세트 탭에서 편집해 주세요.</p>';
-  html += '<div class="cklist">' + list.map(function (st) {
-    var row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
-    return '<div class="ckrow"><div class="ck-name"><strong>' + h(st.name) + '</strong><small class="' + (sv === 'err' ? 'badtxt' : 'muted') + '">' +
-      (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
-      '<div class="ck-items">' + set.homework.map(function (hw) {
-        return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
-          return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
-        }).join('') + '</div></div>';
-      }).join('') + '<button class="mini" data-act="grade-allA" data-st="' + st.id + '">모두 A</button></div></div>';
-  }).join('') + '</div>';
+  if (!A.ckSet || (A.ckSet !== 'ALL' && !d.setById[A.ckSet])) A.ckSet = 'ALL';
+  var bySchool = latestOpenSetBySchool();
+  var rows = d.students.filter(function (st) {
+    if (st.status !== 'active') return false;
+    if (A.ckSet === 'ALL') return !!bySchool[st.school];
+    return st.school === d.setById[A.ckSet].school;
+  }).map(function (st) { return { st: st, set: A.ckSet === 'ALL' ? bySchool[st.school] : d.setById[A.ckSet] }; })
+    .sort(function (a, b) { return a.st.name.localeCompare(b.st.name); });
+  var html = '<div class="toolbar ck-bar"><input id="in-ckq" class="ck-search" placeholder="이름 또는 초성 (예: ㄱㅈㅇ)" value="' + h(A.ckQ) + '" autocomplete="off">' +
+    '<select id="sel-ck" aria-label="세트"><option value="ALL"' + (A.ckSet === 'ALL' ? ' selected' : '') + '>받는 중인 세트 전체</option>' + setOptions(A.ckSet) + '</select></div>' +
+    '<p class="note">이름 첫 글자나 초성만 쳐도 찾아져요. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워져요. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있어요.</p>';
+  if (!d.sets.length) return html + '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  if (!rows.length) return html + '<p class="empty">받는 중인 세트가 있는 학생이 없어요.</p>';
+  html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
   return html;
+}
+function ckRowHtml(st, set) {
+  var r = { st: st, set: set };
+    var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
+    return '<div class="ckrow" id="ck-' + set.id + '-' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
+      '<small class="' + (sv === 'err' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
+      '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
+        return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
+          return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
+        }).join('') + '</div></div>';
+      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없어요.</span>') + '</div></div>';
+}
+function refreshCkRow(setId, sid) {
+  var el = document.getElementById('ck-' + setId + '-' + sid), st = A.data.stuById[sid], set = A.data.setById[setId];
+  if (!el || !st || !set) return;
+  var hidden = el.hidden; el.outerHTML = ckRowHtml(st, set);
+  var el2 = document.getElementById('ck-' + setId + '-' + sid); if (el2) el2.hidden = hidden;
 }
 var ckTimer = null;
 function queueCheckSave() {
@@ -997,8 +1026,7 @@ function flushChecks() {
     var ids = Object.keys(A.dirty[setId]); if (!ids.length) return;
     A.dirty[setId] = {};
     var g = gradesFor(setId);
-    ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; });
-    if (A.tab === 'check') renderKeep();
+    ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; refreshCkRow(setId, id); });
     api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {} }; }) }).then(function (r) {
       ids.forEach(function (id) { A.saving[setId + ':' + id] = r.ok ? 'ok' : 'err'; });
       if (r.ok) {
@@ -1007,7 +1035,7 @@ function flushChecks() {
           if (i >= 0) A.data.checks[i] = c; else A.data.checks.push(c);
         });
       } else toast(r.error, true);
-      if (A.tab === 'check') renderKeep();
+      ids.forEach(function (id) { refreshCkRow(setId, id); });
     });
   });
 }
@@ -1201,16 +1229,18 @@ function onClick(ev) {
     if (act === 'achieve') { F.achieve = t.dataset.v; return renderKeep(); }
   }
   // 선생님
-  if (act === 'tab') { A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
+  if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
   if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔어요.'); }); return; }
   if (act === 'school') { A.school = t.dataset.v; return render(); }
   if (act === 'grade' || act === 'grade-allA') {
-    var setId = A.ckSet, sid = t.dataset.st, g = gradesFor(setId), row = g[sid] || (g[sid] = {});
+    var setId = t.dataset.set, sid = t.dataset.st, g = gradesFor(setId), row = g[sid] || (g[sid] = {});
     if (act === 'grade-allA') A.data.setById[setId].homework.forEach(function (hw) { row[hw] = 'A'; });
     else { var hw = t.dataset.hw; if (row[hw] === t.dataset.v) delete row[hw]; else row[hw] = t.dataset.v; }
     (A.dirty[setId] || (A.dirty[setId] = {}))[sid] = 1;
     A.saving[setId + ':' + sid] = '';
-    queueCheckSave(); return renderKeep();
+    queueCheckSave(); refreshCkRow(setId, sid);
+    var cq = $('#in-ckq'); if (cq && !('ontouchstart' in window)) { cq.focus(); cq.select(); }
+    return;
   }
   if (act === 'copy-sms') { var i = Number(t.dataset.i); copyText(smsText(A.todayRows[i]), $('#sms-' + i)); return; }
   if (act === 'copy-all') { copyText(A.todayRows.map(smsText).join('\n\n'), null); return; }
@@ -1306,15 +1336,26 @@ function onChange(ev) {
     if (t.dataset.edit === 'essay') it.essay = t.checked;
   }
 }
+function applyFilter() {
+  var ck = $('#ck-list');
+  if (ck) {
+    var shown = 0;
+    ck.querySelectorAll('[data-name]').forEach(function (r) { var ok = nameMatch(r.dataset.name, A.ckQ); r.hidden = !ok; if (ok) shown++; });
+    ck.classList.toggle('one', shown === 1);
+    var none = $('#ck-none'); if (none) none.hidden = shown > 0;
+  }
+  var stt = $('#in-q') && root.querySelector('.t tbody');
+  if (stt) stt.querySelectorAll('tr[data-name]').forEach(function (r) { r.hidden = !nameMatch(r.dataset.name, A.q); });
+}
 function onInput(ev) {
   if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
-  if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); var p2 = ev.target.selectionStart; render(); var q2 = $('#in-ckq'); if (q2) { q2.focus(); q2.setSelectionRange(p2, p2); } return; }
-  if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); var pos = ev.target.selectionStart; render(); var q = $('#in-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
+  if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); applyFilter(); return; }
+  if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); applyFilter(); return; }
 }
 /* 한글 입력 중(조합 중)인 마지막 글자가 빠지지 않게: 입력칸을 먼저 확정시킨 뒤 처리 */
 function flushIme(ev, fn) {
   var ae = document.activeElement;
-  if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae !== ev.target) { ae.blur(); setTimeout(fn, 0); }
+  if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae !== ev.target && ae.id !== 'in-ckq' && ae.id !== 'in-q') { ae.blur(); setTimeout(fn, 0); }
   else fn();
 }
 function onClickSafe(ev) { if (!ev.target.closest('[data-act]')) return; flushIme(ev, function () { onClick(ev); }); }
@@ -1355,6 +1396,8 @@ function onSubmit(ev) {
   }
 }
 function afterRender() {
+  applyFilter();
+  if (S.view === 'admin' && A.tab === 'check' && !A.ckFocused) { A.ckFocused = true; var cq = $('#in-ckq'); if (cq && !('ontouchstart' in window)) cq.focus(); }
   var first = root.querySelector('#in-name, #in-pw, #in-new, #in-apw');
   if (first && !('ontouchstart' in window)) first.focus();
 }
@@ -1365,7 +1408,10 @@ function boot() {
   document.addEventListener('change', onChange);
   document.addEventListener('input', onInput);
   document.addEventListener('submit', onSubmitSafe);
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.detail) { A.detail = null; render(); } });
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && A.detail) { A.detail = null; render(); }
+    if (e.target && e.target.id === 'in-ckq' && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); A.ckQ = ''; e.target.value = ''; applyFilter(); }
+  });
   if (S.token && S.role === 'student' && !IS_DEMO) loadHome();
   else if (S.token && S.role === 'admin' && !IS_DEMO) loadAdmin();
   else { S.token = null; S.role = null; render(); }
