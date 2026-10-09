@@ -798,7 +798,7 @@ function viewDone() {
 var A = { tab: 'week', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
 function viewAdminLogin() {
   return '<main class="narrow">' + masthead('선생님 로그인') + '<form class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
-    '<input id="in-apw" type="password" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: demo</p>' : '') +
+    '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: demo</p>' : '') +
     (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') + '<button class="btn primary" type="submit">로그인</button>' +
     '<button class="link" type="button" data-act="back-login">학생 로그인으로</button></form></main>';
 }
