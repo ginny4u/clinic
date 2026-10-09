@@ -1,0 +1,1255 @@
+<title>내신 클리닉 트래커</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Do+Hyeon&family=Jua&family=IBM+Plex+Sans+KR:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap">
+<style>
+/* Layout: 종이 점검표를 옮긴 한 장짜리 시트. 가는 선, 빨간 ♥ 하나, 숫자는 고정폭. */
+:root {
+  --paper: #f3f4f6; --sheet: #ffffff; --ink: #17181c; --muted: #5e6370; --line: #d6d9e0; --line-strong: #17181c;
+  --accent: #b5402f; --accent-ink: #ffffff; --ok: #2c7350; --ok-bg: #e5f1ea; --warn: #9a6a0c; --warn-bg: #f8eed8; --bad: #b5402f; --bad-bg: #f8e4df;
+  --f-display: "Do Hyeon", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-title: "Jua", "Do Hyeon", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --paper: #111215; --sheet: #1a1c20; --ink: #eceef2; --muted: #9ba1ad; --line: #2f323a; --line-strong: #c9ccd3;
+  --accent: #e2705d; --accent-ink: #1a0c09; --ok: #7fcaa2; --ok-bg: #1d2f25; --warn: #e6bb62; --warn-bg: #33291a; --bad: #ef8a78; --bad-bg: #3a201b; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --paper: #111215; --sheet: #1a1c20; --ink: #eceef2; --muted: #9ba1ad; --line: #2f323a; --line-strong: #c9ccd3;
+  --accent: #e2705d; --accent-ink: #1a0c09; --ok: #7fcaa2; --ok-bg: #1d2f25; --warn: #e6bb62; --warn-bg: #33291a; --bad: #ef8a78; --bad-bg: #3a201b; color-scheme: dark; }
+
+body { background: var(--paper); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55; padding: 0 16px; }
+#app { padding-block: 16px 64px; }
+main { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+main.narrow { max-width: 440px; }
+main.wide { max-width: 1120px; }
+h1, h2, h3 { font-family: var(--f-display); font-weight: 400; margin: 0; text-wrap: balance; letter-spacing: 0.01em; }
+h2 { font-size: 1.35rem; } h3 { font-size: 1.05rem; margin-bottom: 6px; }
+h2 small { font-family: var(--f-body); font-size: 0.8rem; color: var(--muted); margin-left: 6px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mast { text-align: center; padding-block: 18px 4px; }
+.mast h1 { font-family: var(--f-title); font-size: clamp(1.7rem, 7vw, 2.3rem); }
+.abar h1 { font-family: var(--f-title); }
+.mascot { display: block; margin: 0 auto 6px; width: 170px; max-width: 60%; height: auto; }
+.mascot.sm { width: 96px; }
+.heart { color: var(--accent); }
+.mast-sub { margin: 6px 0 0; color: var(--muted); }
+.demo { max-width: 1120px; margin: 0 auto 8px; padding: 10px 14px; border: 1px dashed var(--accent); border-radius: 6px; color: var(--muted); font-size: 0.9rem; background: var(--sheet); }
+
+.sheet { background: var(--sheet); border: 1px solid var(--line-strong); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+.stack { display: flex; flex-direction: column; gap: 10px; }
+.stack-lg { display: flex; flex-direction: column; gap: 16px; }
+.block { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.block-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 24px; }
+.two > * { min-width: 0; }
+label { font-weight: 500; font-size: 0.92rem; }
+input:not([type=checkbox]), select, textarea { width: 100%; box-sizing: border-box; padding: 10px 12px; border: 1px solid var(--line); background: var(--paper); border-radius: 4px; }
+input.short { width: 5.5em; }
+textarea { resize: vertical; }
+.hint, .note { margin: 0; color: var(--muted); font-size: 0.88rem; }
+.err { margin: 0; color: var(--bad); font-weight: 500; }
+.empty { margin: 0; color: var(--muted); }
+.foot { text-align: center; }
+.warnline { margin: 0; text-align: center; font-family: var(--f-display); font-size: 1.15rem; }
+
+.btn { padding: 11px 18px; border: 1px solid var(--line-strong); background: var(--sheet); border-radius: 4px; cursor: pointer; font-weight: 600; }
+.btn.primary { background: var(--ink); color: var(--sheet); }
+.btn.choice { text-align: left; font-size: 1.05rem; }
+.btn:hover { border-color: var(--accent); }
+.link { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 0.92rem; }
+.mini { border: 1px solid var(--line); background: var(--sheet); border-radius: 3px; padding: 4px 8px; font-size: 0.82rem; cursor: pointer; white-space: nowrap; }
+.mini.arm { border-color: var(--bad); color: var(--bad); background: var(--bad-bg); }
+.actions { display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.inline { display: inline-flex; gap: 8px; align-items: center; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
+.card { text-align: left; display: flex; flex-direction: column; gap: 6px; padding: 16px; background: var(--sheet); border: 1px solid var(--line-strong); cursor: pointer; }
+.card:hover { border-color: var(--accent); }
+.card strong { font-size: 1.05rem; }
+.card-k { font-family: var(--f-display); color: var(--accent); font-size: 1.1rem; }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 0.82rem; border: 1px solid var(--line); background: var(--sheet); cursor: pointer; width: fit-content; }
+.chip.ok { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
+.chip.todo { background: var(--warn-bg); color: var(--warn); border-color: transparent; }
+.chip.on { background: var(--ink); color: var(--sheet); border-color: var(--ink); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { font-size: 0.75rem; border: 1px solid var(--line); padding: 1px 6px; border-radius: 3px; color: var(--muted); white-space: nowrap; }
+
+.rows { display: flex; flex-direction: column; }
+.row { display: grid; grid-template-columns: 5em 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.qrow { display: grid; grid-template-columns: 3.5em minmax(0, 9em) 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+
+.bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 1.1fr) 4.6em; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.bar-l { min-width: 0; display: flex; flex-direction: column; }
+.bar-l small { color: var(--muted); font-size: 0.76rem; }
+.bar-t { height: 8px; background: var(--paper); border: 1px solid var(--line); }
+.bar-t i { display: block; height: 100%; background: var(--accent); }
+.bar-v { text-align: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 0.9rem; display: flex; flex-direction: column; line-height: 1.2; }
+.bar-v small { color: var(--muted); font-size: 0.72rem; }
+.bar.few { opacity: 0.55; }
+
+.spark svg { width: 100%; max-width: 520px; height: auto; display: block; }
+.spark .grid { stroke: var(--line); stroke-width: 1; }
+.spark .line { fill: none; stroke: var(--ink); stroke-width: 1.6; }
+.spark .dot { fill: var(--accent); }
+.spark .lbl { fill: var(--muted); font-size: 10px; font-family: var(--f-body); }
+.spark .val { fill: var(--ink); font-size: 10px; font-family: var(--f-num); }
+
+.hw { display: flex; flex-direction: column; }
+.hw-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; }
+.seg button { border: 0; border-left: 1px solid var(--line); background: var(--sheet); padding: 7px 12px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+.seg button:first-child { border-left: 0; }
+.seg button.on.done { background: var(--ink); color: var(--sheet); }
+.seg button.on.part { background: var(--warn-bg); color: var(--warn); font-weight: 600; }
+.seg button.on.none, .seg button.on.q { background: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.seg.wide { display: flex; } .seg.wide button { flex: 1; padding: 10px; }
+
+.legend { display: flex; gap: 14px; font-size: 0.85rem; color: var(--muted); }
+.legend span { display: inline-flex; gap: 5px; align-items: center; }
+.k { width: 14px; height: 14px; border: 1px solid var(--line-strong); display: inline-block; }
+.k.x { background: var(--accent); border-color: var(--accent); }
+.k.g { background: repeating-linear-gradient(135deg, var(--warn) 0 3px, var(--warn-bg) 3px 6px); border-color: var(--warn); }
+.grid-no { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 6px; }
+.no { aspect-ratio: 1; max-width: 100%; border: 1px solid var(--line); background: var(--sheet); font-family: var(--f-num); font-size: 0.95rem; cursor: pointer; border-radius: 4px; }
+.no.x { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.no.g { background: repeating-linear-gradient(135deg, var(--warn-bg) 0 6px, var(--sheet) 6px 12px); border: 2px solid var(--warn); color: var(--warn); font-weight: 600; }
+.tally { display: flex; align-items: baseline; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--line-strong); padding-top: 10px; flex-wrap: wrap; }
+.tally strong { font-size: 1.5rem; }
+.tally-g { color: var(--warn); font-weight: 600; }
+
+.fl { display: flex; flex-direction: column; }
+.fl-row { display: grid; grid-template-columns: 2.6em minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.fl-no { font-family: var(--f-num); text-align: center; padding: 4px 0; border-radius: 3px; font-weight: 600; }
+.fl-no.x { background: var(--accent); color: var(--accent-ink); }
+.fl-no.g { border: 2px solid var(--warn); color: var(--warn); }
+.fl-meta { display: flex; flex-direction: column; min-width: 0; }
+.fl-meta small { color: var(--muted); }
+.big { font-size: 3rem; text-align: center; font-family: var(--f-num); }
+.big small { font-size: 1.2rem; color: var(--muted); }
+
+.abar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; border-bottom: 1px solid var(--line-strong); padding-bottom: 10px; }
+.abar h1 { font-size: 1.6rem; display: flex; align-items: center; gap: 8px; }
+.abar h1 img { width: 44px; height: auto; }
+.tabs { display: flex; gap: 2px; flex-wrap: wrap; }
+.tabs button { border: 0; background: none; padding: 8px 12px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
+.tabs button.on { border-bottom-color: var(--accent); }
+.abar-r { margin-left: auto; display: flex; gap: 14px; }
+.toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.toolbar select { width: auto; min-width: 200px; max-width: 100%; }
+.toolbar input { width: auto; flex: 1; min-width: 140px; max-width: 260px; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; border: 1px solid var(--line-strong); background: var(--sheet); }
+.kpis > div { padding: 12px 16px; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+.kpis > div:first-child { border-left: 0; }
+.kpis span { color: var(--muted); font-size: 0.85rem; }
+.kpis strong { font-size: 1.6rem; font-weight: 500; }
+.kpis small { font-size: 0.9rem; color: var(--muted); }
+
+.tscroll { overflow-x: auto; border: 1px solid var(--line); background: var(--sheet); }
+.t { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+.t th { text-align: left; font-weight: 600; font-size: 0.8rem; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line-strong); white-space: nowrap; }
+.t td { padding: 7px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.t .r { text-align: right; } .t .c { text-align: center; }
+.t .muted, .muted { color: var(--muted); }
+.t .msg { max-width: 22em; font-size: 0.85rem; }
+.t tr.dim td { opacity: 0.5; }
+.t tr.grp td { font-family: var(--f-display); font-size: 1rem; background: var(--paper); padding-top: 10px; }
+.acts { display: flex; gap: 6px; justify-content: flex-end; }
+.cellbar { position: relative; min-width: 110px; }
+.cellbar i { position: absolute; left: 10px; top: 50%; height: 8px; transform: translateY(-50%); background: var(--accent); max-width: calc(100% - 64px); }
+.cellbar span { position: relative; float: right; font-family: var(--f-num); font-size: 0.85rem; }
+.heat-t td.heat { text-align: center; background: color-mix(in srgb, var(--accent) calc(var(--r) * 58%), transparent); min-width: 64px; }
+.heat-t td.heat b { font-family: var(--f-num); font-weight: 500; display: block; }
+.heat-t td.heat small { color: var(--muted); font-size: 0.7rem; font-family: var(--f-num); }
+.heat-t td.few { opacity: 0.5; }
+.heat-t td.empty-c { color: var(--muted); text-align: center; }
+.hwstat { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.hwstat small { flex-basis: 100%; color: var(--muted); }
+.badtxt { color: var(--bad); }
+.form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.form-grid label { display: flex; flex-direction: column; gap: 4px; }
+.edit-t input, .edit-t select { padding: 6px 8px; min-width: 120px; }
+details summary { cursor: pointer; font-weight: 600; }
+details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; flex-direction: column; gap: 8px; }
+
+.overlay { position: fixed; inset: 0; background: color-mix(in srgb, var(--ink) 40%, transparent); display: flex; justify-content: center; align-items: flex-start; padding: 40px 16px; overflow-y: auto; z-index: 10; }
+.modal { background: var(--sheet); border: 1px solid var(--line-strong); max-width: 860px; width: 100%; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+.toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--sheet); padding: 10px 16px; border-radius: 4px; z-index: 20; font-size: 0.92rem; max-width: calc(100% - 32px); }
+.toast.bad { background: var(--bad); color: var(--accent-ink); }
+@media (max-width: 520px) {
+  .fl-row { grid-template-columns: 2.4em minmax(0, 1fr); }
+  .fl-row .seg { grid-column: 1 / -1; justify-self: end; }
+  .qrow { grid-template-columns: 3.5em 1fr; } .qrow span:last-child { grid-column: 1 / -1; }
+  .abar-r { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+<div id="app"></div>
+<script>
+/* ▼ Apps Script 웹 앱 주소. 비워 두면 예시 데이터 미리보기로 열려요. */
+var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB_-CxSnZND29jsOmX6yDW-QLcFYvlQlh3QnpAGBCkDG11Zqik-_A/exec';
+</script>
+<script>
+/* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
+var CORE_VERSION = 1;
+
+function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
+
+function coreHandle(req, store, env) {
+  try {
+    var a = req && req.action;
+    if (!a) return fail('요청이 비어 있습니다.');
+    var fn = CORE_ACTIONS[a];
+    if (!fn) return fail('알 수 없는 요청입니다: ' + a);
+    return fn(req, store, env);
+  } catch (e) {
+    return fail(e && e.userMessage ? e.userMessage : ('서버 오류가 났습니다: ' + (e && e.message ? e.message : e)));
+  }
+}
+
+function fail(msg) { return { ok: false, error: msg }; }
+function userErr(msg) { var e = new Error(msg); e.userMessage = msg; return e; }
+
+function pwHash(env, id, pw) { return env.hash('clinic:' + id + ':' + pw); }
+
+function labelFor(st, all) {
+  var same = all.filter(function (s) { return s.status === 'active' && normName(s.name) === normName(st.name); });
+  if (same.length <= 1) return st.name;
+  var sameSchool = same.filter(function (s) { return s.school === st.school; });
+  return st.name + '(' + st.school + ')' + (sameSchool.length > 1 ? ' ' + st.id : '');
+}
+
+function publicStudent(s) {
+  return { id: s.id, school: s.school, name: s.name, status: s.status, mustChange: !!s.mustChange, joinedAt: s.joinedAt };
+}
+
+function requireStudent(req, store, env) {
+  var id = req.token && env.cacheGet('t:' + req.token);
+  if (!id) throw userErr('로그인 시간이 지났습니다. 다시 로그인해 주세요.');
+  var st = store.students().filter(function (s) { return s.id === id; })[0];
+  if (!st || st.status !== 'active') throw userErr('등록된 학생이 아닙니다. 선생님께 말씀 드리세요.');
+  return st;
+}
+
+function requireAdmin(req, store, env) {
+  var ok = req.token && env.cacheGet('a:' + req.token);
+  if (!ok) throw userErr('선생님 로그인이 필요해요. 다시 로그인해 주세요.');
+  return true;
+}
+
+function lockCheck(env, key) {
+  var n = Number(env.cacheGet('fail:' + key) || 0);
+  if (n >= 5) throw userErr('비밀번호를 5번 틀려서 잠겼습니다. 10분 뒤에 다시 시도해 주세요.');
+  return n;
+}
+function lockBump(env, key, n) { env.cachePut('fail:' + key, String(n + 1), 600); }
+
+function itemsMap(store) {
+  var m = {};
+  store.allItems().forEach(function (r) { m[r.setId] = r.items; });
+  return m;
+}
+
+function cleanMarks(obj, n, allowed) {
+  var out = {};
+  if (!obj || typeof obj !== 'object') return out;
+  Object.keys(obj).forEach(function (k) {
+    var no = Number(k), v = obj[k];
+    if (no >= 1 && no <= n && allowed.indexOf(v) >= 0) out[no] = v;
+  });
+  return out;
+}
+
+var CORE_ACTIONS = {
+  /* ---------- 학생 ---------- */
+  lookup: function (req, store) {
+    var q = normName(req.name);
+    if (!q) return fail('이름을 입력해 주세요.');
+    var all = store.students();
+    var hits = all.filter(function (s) { return s.status === 'active' && normName(s.name) === q; });
+    if (!hits.length) return fail('명단에 없는 이름입니다. 오타가 없는지 확인하고, 그래도 안 되면 선생님께 말씀 드리세요.');
+    return { ok: true, matches: hits.map(function (s) { return { id: s.id, label: labelFor(s, all) }; }) };
+  },
+
+  login: function (req, store, env) {
+    var st = store.students().filter(function (s) { return s.id === req.id; })[0];
+    if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
+    var n = lockCheck(env, st.id);
+    if (pwHash(env, st.id, String(req.pw || '')) !== st.pwHash) {
+      lockBump(env, st.id, n);
+      return fail('비밀번호가 틀렸습니다. (' + (n + 1) + '/5)');
+    }
+    env.cacheRemove('fail:' + st.id);
+    var token = env.uuid();
+    env.cachePut('t:' + token, st.id, 21600);
+    return { ok: true, token: token, me: publicStudent(st) };
+  },
+
+  changePw: function (req, store, env) {
+    var st = requireStudent(req, store, env);
+    var pw = String(req.newPw || '');
+    if (!/^\d{4}$/.test(pw)) return fail('비밀번호는 숫자 4자리로 정해 주세요.');
+    if (pw === '0000') return fail('0000은 쓸 수 없습니다. 다른 번호로 정해 주세요.');
+    st.pwHash = pwHash(env, st.id, pw);
+    st.mustChange = false;
+    store.putStudent(st);
+    return { ok: true, me: publicStudent(st) };
+  },
+
+  home: function (req, store, env) {
+    var st = requireStudent(req, store, env);
+    var sets = store.sets().filter(function (s) { return s.school === st.school; });
+    var im = itemsMap(store);
+    var mySubs = store.subs().filter(function (s) { return s.studentId === st.id; });
+    var bySet = {};
+    mySubs.forEach(function (s) { bySet[s.setId] = s; });
+    var outSets = sets.map(function (s) {
+      var sub = bySet[s.id];
+      var n = (im[s.id] || []).length;
+      var wrong = sub ? Object.keys(sub.marks).filter(function (k) { return sub.marks[k] === 'X'; }).length : 0;
+      return { id: s.id, week: s.week, title: s.title, open: !!s.open, createdAt: s.createdAt, total: n,
+        submitted: !!sub, score: sub ? n - wrong : null };
+    }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); });
+    var history = mySubs.map(function (s) {
+      return { setId: s.setId, marks: s.marks, submittedAt: s.submittedAt };
+    });
+    var items = {};
+    mySubs.forEach(function (s) { items[s.setId] = im[s.setId] || []; });
+    return { ok: true, me: publicStudent(st), sets: outSets, history: history, items: items };
+  },
+
+  getSet: function (req, store, env) {
+    var st = requireStudent(req, store, env);
+    var set = store.sets().filter(function (s) { return s.id === req.setId; })[0];
+    if (!set || set.school !== st.school) return fail('클리닉을 잘못 선택하셨습니다.');
+    var items = itemsMap(store)[set.id] || [];
+    var sub = store.subs().filter(function (s) { return s.setId === set.id && s.studentId === st.id; })[0] || null;
+    return { ok: true, set: set, items: items, sub: sub };
+  },
+
+  submit: function (req, store, env) {
+    var st = requireStudent(req, store, env);
+    var set = store.sets().filter(function (s) { return s.id === req.setId; })[0];
+    if (!set || set.school !== st.school) return fail('클리닉을 잘못 선택하셨습니다.');
+    if (!set.open) return fail('주차가 마감된 클리닉입니다. 선생님께 말씀 드리세요.');
+    var items = itemsMap(store)[set.id] || [];
+    var n = items.length;
+    var marks = cleanMarks(req.marks, n, ['X', 'G']);
+    var follow = cleanMarks(req.follow, n, ['U', 'Q']);
+    Object.keys(follow).forEach(function (k) { if (!marks[k]) delete follow[k]; });
+    var hw = {};
+    (set.homework || []).forEach(function (h) {
+      var v = req.homework && req.homework[h];
+      if (['done', 'part', 'none'].indexOf(v) >= 0) hw[h] = v;
+    });
+    var achieve = ['상', '중', '하'].indexOf(req.achieve) >= 0 ? req.achieve : '';
+    var sub = { setId: set.id, studentId: st.id, submittedAt: env.now(), marks: marks, follow: follow,
+      homework: hw, achieve: achieve, message: String(req.message || '').slice(0, 1000) };
+    store.putSub(sub);
+    var wrong = Object.keys(marks).filter(function (k) { return marks[k] === 'X'; }).length;
+    return { ok: true, score: n - wrong, total: n };
+  },
+
+  /* ---------- 선생님 ---------- */
+  adminLogin: function (req, store, env) {
+    var n = lockCheck(env, 'admin');
+    if (!env.adminPassword || String(req.pw || '') !== env.adminPassword) {
+      lockBump(env, 'admin', n);
+      return fail('비밀번호가 맞지 않아요. (' + (n + 1) + '/5)');
+    }
+    env.cacheRemove('fail:admin');
+    var token = env.uuid();
+    env.cachePut('a:' + token, '1', 21600);
+    return { ok: true, token: token };
+  },
+
+  adminAll: function (req, store, env) {
+    requireAdmin(req, store, env);
+    return { ok: true, students: store.students().map(publicStudent), sets: store.sets(),
+      items: itemsMap(store), subs: store.subs() };
+  },
+
+  addStudents: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var list = Array.isArray(req.list) ? req.list : [];
+    var all = store.students();
+    var added = [], skipped = [], fresh = [];
+    var maxNo = all.reduce(function (m, s) { var k = Number(String(s.id).replace(/\D/g, '')) || 0; return Math.max(m, k); }, 0);
+    list.forEach(function (r) {
+      var school = String(r.school || '').trim(), name = String(r.name || '').trim();
+      if (!school || !name) return;
+      var dup = all.filter(function (s) { return s.school === school && normName(s.name) === normName(name); })[0];
+      if (dup) {
+        if (dup.status !== 'active') { dup.status = 'active'; store.putStudent(dup); added.push(name + '(' + school + ', 복귀)'); }
+        else skipped.push(name + '(' + school + ')');
+        return;
+      }
+      maxNo += 1;
+      var id = 'S' + ('000' + maxNo).slice(-4);
+      var st = { id: id, school: school, name: name, pwHash: pwHash(env, id, '0000'), mustChange: true,
+        status: 'active', joinedAt: env.now() };
+      fresh.push(st); all = all.concat([st]); added.push(name + '(' + school + ')');
+    });
+    if (fresh.length) {
+      if (store.insertStudents) store.insertStudents(fresh);
+      else fresh.forEach(function (st) { store.putStudent(st); });
+    }
+    return { ok: true, added: added, skipped: skipped };
+  },
+
+  updateStudent: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var st = store.students().filter(function (s) { return s.id === req.id; })[0];
+    if (!st) return fail('학생을 찾을 수 없어요.');
+    if (req.op === 'reset') { st.pwHash = pwHash(env, st.id, '0000'); st.mustChange = true; env.cacheRemove('fail:' + st.id); }
+    else if (req.op === 'leave') st.status = 'left';
+    else if (req.op === 'return') st.status = 'active';
+    else if (req.op === 'edit') {
+      if (req.name) st.name = String(req.name).trim();
+      if (req.school) st.school = String(req.school).trim();
+    } else return fail('알 수 없는 작업이에요.');
+    store.putStudent(st);
+    return { ok: true, student: publicStudent(st) };
+  },
+
+  saveSet: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var s = req.set || {};
+    if (!s.school || !s.week) return fail('학교와 주차를 입력해 주세요.');
+    var items = (Array.isArray(req.items) ? req.items : []).map(function (it, i) {
+      return { no: i + 1, work: String(it.work || '').trim(), area: String(it.area || '').trim(),
+        types: (Array.isArray(it.types) ? it.types : []).filter(Boolean).slice(0, 2), essay: !!it.essay };
+    });
+    if (!items.length) return fail('문항이 하나도 없어요.');
+    var old = s.id && store.sets().filter(function (x) { return x.id === s.id; })[0];
+    var set = { id: old ? old.id : 'C' + env.uuid().replace(/-/g, '').slice(0, 10), school: String(s.school).trim(),
+      week: String(s.week).trim(), title: String(s.title || (s.school + ' ' + s.week)).trim(),
+      homework: (Array.isArray(s.homework) ? s.homework : []).map(function (h) { return String(h).trim(); }).filter(Boolean),
+      open: s.open === undefined ? true : !!s.open, createdAt: old ? old.createdAt : env.now() };
+    store.putSet(set);
+    store.putItems(set.id, items);
+    return { ok: true, set: set };
+  },
+
+  setOpen: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var set = store.sets().filter(function (x) { return x.id === req.id; })[0];
+    if (!set) return fail('세트를 찾을 수 없어요.');
+    set.open = !!req.open; store.putSet(set);
+    return { ok: true, set: set };
+  },
+
+  deleteSet: function (req, store, env) {
+    requireAdmin(req, store, env);
+    store.deleteSet(req.id);
+    return { ok: true };
+  }
+};
+
+/* ===== 미리보기용 예시 데이터 (실제 학생 아님) ===== */
+function makeDemoBackend(sampleSet) {
+  var seed = 20261009;
+  function rnd() { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+  function fnv(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); }
+  var cache = {};
+  var env = {
+    adminPassword: 'demo',
+    hash: fnv,
+    uuid: function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); },
+    now: function () { return new Date().toISOString(); },
+    cacheGet: function (k) { return cache[k] || null; },
+    cachePut: function (k, v) { cache[k] = v; },
+    cacheRemove: function (k) { delete cache[k]; }
+  };
+
+  var roster = {
+    '동양': ['김지원', '박서준', '이하린', '최도윤', '정예린', '강시우', '조은서', '윤태오', '장서아', '임주원', '한지호', '오유나', '서건우', '신채아'],
+    '한서': ['김도현', '이준서', '박하은', '최서윤', '정민재', '강나연', '조하람', '윤지안'],
+    '경복': ['김지원', '이소율', '박지아', '최유진', '정다인', '한서영']
+  };
+  var students = [], no = 0;
+  Object.keys(roster).forEach(function (sc) {
+    roster[sc].forEach(function (nm) {
+      no++; var id = 'S' + ('000' + no).slice(-4);
+      students.push({ id: id, school: sc, name: nm, pwHash: fnv('clinic:' + id + ':0000'), mustChange: true, status: 'active',
+        joinedAt: nm === '신채아' || nm === '윤지안' ? '2026-09-24T09:00:00.000Z' : '2026-09-01T09:00:00.000Z' });
+    });
+  });
+  students.push({ id: 'S0099', school: '동양', name: '문가온', pwHash: fnv('clinic:S0099:0000'), mustChange: false, status: 'left', joinedAt: '2026-09-01T09:00:00.000Z' });
+
+  function synth(spec) {
+    var out = [];
+    spec.forEach(function (s) {
+      for (var i = 0; i < s[3]; i++) out.push({ no: out.length + 1, work: s[0], area: s[1], types: [s[2][i % s[2].length]].concat(rnd() < 0.25 && s[2].length > 1 ? [s[2][(i + 1) % s[2].length]] : []), essay: i === s[3] - 1 && s[1] === '문학' });
+    });
+    return out;
+  }
+  var HW = ['자습서', '평가문제집', '수국', '자체교재'];
+  var sets = [], items = [];
+  function addSet(id, school, week, date, open, its) {
+    sets.push({ id: id, school: school, week: week, title: school + '1 ' + week + ' 클리닉', homework: HW.slice(), open: open, createdAt: date });
+    items.push({ setId: id, items: its });
+  }
+  addSet('D4', '동양', '4주차', '2026-09-14T09:00:00.000Z', false, synth([
+    ['세종어제훈민정음', '문법', ['G1'], 8], ['용비어천가', '문법', ['G1', 'L7'], 6], ['상춘곡', '문학', ['L2', 'L5', 'L3', 'L1'], 10], ['가시리', '문학', ['L4', 'L2', 'L6'], 6]]));
+  addSet('D5', '동양', '5주차', '2026-09-21T09:00:00.000Z', false, synth([
+    ['중세국어 복합', '문법', ['G1', 'G2'], 8], ['흥보전', '문학', ['L1', 'L2', 'L5', 'L4'], 10], ['상춘곡', '문학', ['L2', 'L3', 'L5'], 8], ['이별 시가 엮어 읽기', '문학', ['L6', 'L4'], 6]]));
+  addSet('D6', '동양', '6주차', '2026-09-28T09:00:00.000Z', true, sampleSet.items);
+  addSet('H5', '한서', '5주차', '2026-09-21T09:00:00.000Z', false, synth([
+    ['문장 성분', '문법', ['G3'], 8], ['아홉 켤레의 구두로 남은 사내', '문학', ['L1', 'L4', 'L2', 'L5'], 10], ['제망매가', '문학', ['L2', 'L7', 'L3'], 7]]));
+  addSet('H6', '한서', '6주차', '2026-09-28T09:00:00.000Z', true, synth([
+    ['문장 성분', '문법', ['G3', 'G2'], 8], ['한글 맞춤법', '문법', ['G5'], 4], ['아홉 켤레의 구두로 남은 사내', '문학', ['L4', 'L1', 'L3', 'L5'], 8], ['속미인곡', '문학', ['L2', 'L7', 'L4'], 8]]));
+  addSet('K5', '경복', '5주차', '2026-09-21T09:00:00.000Z', true, synth([
+    ['문법 요소', '문법', ['G4'], 8], ['서경별곡', '문학', ['L2', 'L4', 'L6'], 6], ['수오재기', '문학', ['L1', 'L3', 'L5'], 6]]));
+
+  var hard = { L5: 0.12, L6: 0.1, G1: 0.06, L7: 0.05, R3: 0.1, G5: 0.08 };
+  var msgs = ['상춘곡 현대어 풀이 다시 해주세요', '보기 문제 시간이 너무 오래 걸려요', '흥보전 인물 정리 프린트 더 있나요', '중세국어 주격 조사 헷갈림', '', '', '', '', ''];
+  var subs = [];
+  students.forEach(function (st) {
+    var base = 0.06 + rnd() * 0.22, weak = {};
+    ['L2', 'L5', 'L6', 'G1', 'G3', 'L4', 'R1'].forEach(function (t) { if (rnd() < 0.3) weak[t] = 0.08 + rnd() * 0.18; });
+    sets.forEach(function (set) {
+      if (set.school !== st.school) return;
+      if (st.joinedAt > set.createdAt) return;
+      if (st.status !== 'active' && set.open) return;
+      if (rnd() > (set.open ? 0.78 : 0.92)) return;
+      var its = items.filter(function (r) { return r.setId === set.id; })[0].items;
+      var marks = {}, follow = {};
+      its.forEach(function (it) {
+        var p = base;
+        it.types.forEach(function (t) { p += (hard[t] || 0) + (weak[t] || 0); });
+        var r = rnd();
+        if (r < p) { marks[it.no] = 'X'; follow[it.no] = rnd() < 0.1 ? 'Q' : 'U'; }
+        else if (r < p * 1.35) { marks[it.no] = 'G'; follow[it.no] = rnd() < 0.05 ? 'Q' : 'U'; }
+      });
+      var hw = {}; set.homework.forEach(function (h) { var q = rnd(); hw[h] = q < 0.72 ? 'done' : q < 0.9 ? 'part' : 'none'; });
+      subs.push({ setId: set.id, studentId: st.id, submittedAt: set.createdAt.replace('09:00', '20:' + (10 + Math.floor(rnd() * 40))),
+        marks: marks, follow: follow, homework: hw, achieve: pick(['상', '중', '중', '하']), message: pick(msgs) });
+    });
+  });
+
+  var store = {
+    students: function () { return students; },
+    putStudent: function (s) { var i = students.findIndex(function (x) { return x.id === s.id; }); if (i >= 0) students[i] = s; else students.push(s); },
+    sets: function () { return sets; },
+    putSet: function (s) { var i = sets.findIndex(function (x) { return x.id === s.id; }); if (i >= 0) sets[i] = s; else sets.push(s); },
+    allItems: function () { return items; },
+    putItems: function (id, its) { var i = items.findIndex(function (x) { return x.setId === id; }); if (i >= 0) items[i] = { setId: id, items: its }; else items.push({ setId: id, items: its }); },
+    subs: function () { return subs; },
+    putSub: function (s) { var i = subs.findIndex(function (x) { return x.setId === s.setId && x.studentId === s.studentId; }); if (i >= 0) subs[i] = s; else subs.push(s); },
+    deleteSet: function (id) { sets = sets.filter(function (x) { return x.id !== id; }); items = items.filter(function (x) { return x.setId !== id; }); subs = subs.filter(function (x) { return x.setId !== id; }); }
+  };
+  return function (req) { return JSON.parse(JSON.stringify(coreHandle(req, store, env))); };
+}
+
+var SAMPLE_SET = {"school": "동양", "week": "6주차", "title": "동양1 6주차 클리닉", "homework": ["자습서", "평가문제집", "수국", "자체교재"], "items": [{"no": 1, "work": "세종어제훈민정음", "area": "문법", "types": ["G1"], "essay": false}, {"no": 2, "work": "세종어제훈민정음", "area": "문법", "types": ["G1"], "essay": false}, {"no": 3, "work": "세종어제훈민정음", "area": "문법", "types": ["G1"], "essay": false}, {"no": 4, "work": "세종어제훈민정음", "area": "문법", "types": ["G1"], "essay": false}, {"no": 5, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "G2"], "essay": false}, {"no": 6, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 7, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 8, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 9, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 10, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 11, "work": "세종어제훈민정음", "area": "문법", "types": ["G1"], "essay": false}, {"no": 12, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "G5"], "essay": false}, {"no": 13, "work": "용비어천가", "area": "문법", "types": ["G1"], "essay": false}, {"no": 14, "work": "용비어천가", "area": "문법", "types": ["G1"], "essay": false}, {"no": 15, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "L7"], "essay": false}, {"no": 16, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "L7"], "essay": false}, {"no": 17, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 18, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 19, "work": "중세국어 복합", "area": "문법", "types": ["G1"], "essay": false}, {"no": 20, "work": "중세국어 복합", "area": "문법", "types": ["G1", "G2"], "essay": false}, {"no": 21, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "G2"], "essay": false}, {"no": 22, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "G4"], "essay": false}, {"no": 23, "work": "세종어제훈민정음", "area": "문법", "types": ["G1", "G5"], "essay": false}, {"no": 24, "work": "상춘곡", "area": "문학", "types": ["L1"], "essay": false}, {"no": 25, "work": "상춘곡", "area": "문학", "types": ["L2"], "essay": false}, {"no": 26, "work": "상춘곡", "area": "문학", "types": ["L2", "L6"], "essay": false}, {"no": 27, "work": "상춘곡", "area": "문학", "types": ["L3", "L6"], "essay": false}, {"no": 28, "work": "상춘곡", "area": "문학", "types": ["L1"], "essay": false}, {"no": 29, "work": "상춘곡", "area": "문학", "types": ["L5", "L6"], "essay": false}, {"no": 30, "work": "상춘곡", "area": "문학", "types": ["L2"], "essay": false}, {"no": 31, "work": "상춘곡", "area": "문학", "types": ["L3", "L4"], "essay": false}, {"no": 32, "work": "상춘곡", "area": "문학", "types": ["L2"], "essay": false}, {"no": 33, "work": "상춘곡", "area": "문학", "types": ["L5"], "essay": false}, {"no": 34, "work": "상춘곡", "area": "문학", "types": ["L5"], "essay": false}, {"no": 35, "work": "상춘곡", "area": "문학", "types": ["L2"], "essay": true}, {"no": 36, "work": "상춘곡", "area": "문학", "types": ["L2"], "essay": false}, {"no": 37, "work": "상춘곡", "area": "문학", "types": ["L1", "L5"], "essay": false}, {"no": 38, "work": "상춘곡", "area": "문학", "types": ["L3", "L4"], "essay": false}, {"no": 39, "work": "흥보전", "area": "문학", "types": ["L1"], "essay": false}, {"no": 40, "work": "흥보전", "area": "문학", "types": ["L1"], "essay": false}, {"no": 41, "work": "흥보전", "area": "문학", "types": ["L6", "L5"], "essay": false}, {"no": 42, "work": "흥보전", "area": "문학", "types": ["L5"], "essay": false}, {"no": 43, "work": "흥보전", "area": "문학", "types": ["L5"], "essay": false}, {"no": 44, "work": "흥보전", "area": "문학", "types": ["L4"], "essay": false}, {"no": 45, "work": "흥보전", "area": "문학", "types": ["L3"], "essay": false}, {"no": 46, "work": "흥보전", "area": "문학", "types": ["L1"], "essay": false}, {"no": 47, "work": "흥보전", "area": "문학", "types": ["L1"], "essay": false}, {"no": 48, "work": "흥보전", "area": "문학", "types": ["L2"], "essay": false}, {"no": 49, "work": "흥보전", "area": "문학", "types": ["L2"], "essay": false}, {"no": 50, "work": "흥보전", "area": "문학", "types": ["L2"], "essay": true}, {"no": 51, "work": "흥보전", "area": "문학", "types": ["L1"], "essay": false}, {"no": 52, "work": "흥보전", "area": "문학", "types": ["L2"], "essay": false}, {"no": 53, "work": "흥보전", "area": "문학", "types": ["L2"], "essay": false}, {"no": 54, "work": "흥보전", "area": "문학", "types": ["L3"], "essay": false}, {"no": 55, "work": "산에 가면", "area": "문학", "types": ["L2"], "essay": false}, {"no": 56, "work": "산에 가면", "area": "문학", "types": ["L2"], "essay": false}, {"no": 57, "work": "산에 가면", "area": "문학", "types": ["L1"], "essay": false}, {"no": 58, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L1", "L6"], "essay": false}, {"no": 59, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L1", "L6"], "essay": false}, {"no": 60, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L1"], "essay": false}, {"no": 61, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L3"], "essay": false}, {"no": 62, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L4", "L6"], "essay": false}, {"no": 63, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L4", "L3"], "essay": false}, {"no": 64, "work": "이별 시가 엮어 읽기", "area": "문학", "types": ["L6", "L1"], "essay": false}, {"no": 65, "work": "인공 지능, 예술에 도전하다", "area": "독서", "types": ["R2"], "essay": false}, {"no": 66, "work": "인공 지능, 예술에 도전하다", "area": "독서", "types": ["R1"], "essay": false}, {"no": 67, "work": "인공 지능, 예술에 도전하다", "area": "독서", "types": ["R4"], "essay": false}, {"no": 68, "work": "인공 지능, 예술에 도전하다", "area": "독서", "types": ["R3"], "essay": false}, {"no": 69, "work": "인공 지능, 예술에 도전하다", "area": "독서", "types": ["R1"], "essay": false}, {"no": 70, "work": "예술하는 인공 지능", "area": "독서", "types": ["R1"], "essay": false}, {"no": 71, "work": "예술하는 인공 지능", "area": "독서", "types": ["R3"], "essay": false}, {"no": 72, "work": "예술하는 인공 지능", "area": "독서", "types": ["R1"], "essay": false}, {"no": 73, "work": "AI와 예술 (두 글 엮기)", "area": "독서", "types": ["R2"], "essay": false}, {"no": 74, "work": "AI와 예술 (두 글 엮기)", "area": "독서", "types": ["R1"], "essay": false}, {"no": 75, "work": "AI와 예술 (두 글 엮기)", "area": "독서", "types": ["R3"], "essay": false}, {"no": 76, "work": "AI와 예술 (두 글 엮기)", "area": "독서", "types": ["R1"], "essay": false}]};
+var MASCOT = "data:image/webp;base64,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";
+/* ===== 화면 ===== */
+var TYPES = {
+  L1: '내용·주제 이해', L2: '시어·구절의 의미', L3: '표현·서술상 특징', L4: '화자·인물', L5: '〈보기〉 적용 감상', L6: '작품 비교', L7: '고전 해석',
+  G1: '중세국어', G2: '품사·단어 형성', G3: '문장 성분·구조', G4: '문법 요소', G5: '맞춤법·음운',
+  R1: '세부 내용·추론', R2: '구조·전개 방식', R3: '관점 비교·〈보기〉 적용', R4: '어휘',
+  M1: '화법·작문·매체'
+};
+var AREAS = [['문학', 'L'], ['문법', 'G'], ['독서', 'R'], ['화법·작문·매체', 'M']];
+function areaOfType(t) { var a = AREAS.filter(function (x) { return x[1] === t[0]; })[0]; return a ? a[0] : ''; }
+var HW_LABEL = { done: '다 함', part: '조금', none: '안 함' };
+
+var IS_DEMO = !CLINIC_API_URL;
+var demoCall = IS_DEMO ? makeDemoBackend(SAMPLE_SET) : null;
+
+function store_get(k) { try { return localStorage.getItem('clinic.' + k); } catch (e) { return null; } }
+function store_set(k, v) { try { if (v === null) localStorage.removeItem('clinic.' + k); else localStorage.setItem('clinic.' + k, v); } catch (e) { } }
+
+function api(action, payload) {
+  var req = Object.assign({ action: action }, payload || {});
+  if (IS_DEMO) return new Promise(function (res) { setTimeout(function () { res(demoCall(req)); }, 120); });
+  return fetch(CLINIC_API_URL, { method: 'POST', body: JSON.stringify(req) })
+    .then(function (r) { return r.json(); })
+    .catch(function () { return { ok: false, error: '서버에 연결되지 않습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.' }; });
+}
+
+function h(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+function pct(x) { return Math.round(x * 100) + '%'; }
+function $(sel) { return document.querySelector(sel); }
+function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
+
+var S = { role: store_get('role'), token: store_get('token'), me: null, view: 'login' };
+var root;
+
+function setView(v) { S.view = v; render(); window.scrollTo(0, 0); }
+function toast(msg, bad) {
+  var t = document.createElement('div'); t.className = 'toast' + (bad ? ' bad' : ''); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(function () { t.remove(); }, 2600);
+}
+
+/* ---------- 통계 ---------- */
+function calc(entries) {
+  var type = {}, work = {}, area = {}, total = { n: 0, x: 0, g: 0 };
+  entries.forEach(function (e) {
+    (e.items || []).forEach(function (it) {
+      var m = e.marks[it.no];
+      var x = m === 'X' ? 1 : 0, g = m === 'G' ? 1 : 0;
+      function add(bucket, key) { var b = bucket[key] || (bucket[key] = { n: 0, x: 0, g: 0 }); b.n++; b.x += x; b.g += g; }
+      it.types.forEach(function (t) { add(type, t); });
+      if (it.work) add(work, it.work);
+      if (it.area) add(area, it.area);
+      total.n++; total.x += x; total.g += g;
+    });
+  });
+  return { type: type, work: work, area: area, total: total };
+}
+function rate(b) { return b && b.n ? (b.x + b.g) / b.n : 0; }
+function sortedRates(bucket, minN) {
+  return Object.keys(bucket).map(function (k) { return { key: k, b: bucket[k], r: rate(bucket[k]) }; })
+    .filter(function (o) { return o.b.n >= (minN || 1); })
+    .sort(function (a, b) { return b.r - a.r; });
+}
+function barRow(label, b, sub) {
+  var r = rate(b), few = b.n < 5;
+  return '<div class="bar' + (few ? ' few' : '') + '"><div class="bar-l"><span>' + h(label) + '</span>' + (sub ? '<small>' + h(sub) + '</small>' : '') +
+    '</div><div class="bar-t"><i style="width:' + Math.max(2, r * 100) + '%"></i></div><div class="bar-v">' + pct(r) +
+    '<small>' + (b.x + b.g) + '/' + b.n + '</small></div></div>';
+}
+
+/* ---------- 공통 틀 ---------- */
+function demoBanner() {
+  if (!IS_DEMO) return '';
+  return '<div class="demo">예시 데이터로 보는 미리보기예요. 학생 이름과 기록은 모두 예시입니다. ' +
+    '<button class="link" data-act="demo-student">예시 학생으로 들어가기</button> · <button class="link" data-act="demo-admin">선생님 화면 보기</button></div>';
+}
+function masthead(sub, size) {
+  var img = size === 'none' ? '' : '<img class="mascot' + (size === 'sm' ? ' sm' : '') + '" src="' + MASCOT + '" alt="">';
+  return '<header class="mast">' + img + '<h1><span class="heart">♥</span> 내신 클리닉 트래커 <span class="heart">♥</span></h1>' + (sub ? '<p class="mast-sub">' + sub + '</p>' : '') + '</header>';
+}
+
+function render() {
+  var v = S.view, html = demoBanner();
+  if (v === 'login') html += viewLogin();
+  else if (v === 'pick') html += viewPick();
+  else if (v === 'pw') html += viewPw();
+  else if (v === 'change') html += viewChange();
+  else if (v === 'home') html += viewHome();
+  else if (v === 'form') html += viewForm();
+  else if (v === 'done') html += viewDone();
+  else if (v === 'admin-login') html += viewAdminLogin();
+  else if (v === 'admin') html += viewAdmin();
+  root.innerHTML = html;
+  afterRender();
+}
+
+/* ---------- 학생: 로그인 ---------- */
+var L = { name: '', matches: [], pick: null, err: '' };
+function viewLogin() {
+  return '<main class="narrow">' + masthead('이름을 입력해 주세요!') +
+    '<form class="sheet stack" id="f-name"><label for="in-name">이름</label>' +
+    '<input id="in-name" autocomplete="off" value="' + h(L.name) + '" placeholder="홍길동">' +
+    (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') +
+    '<button class="btn primary" type="submit">다음</button></form>' +
+    '<p class="foot"><button class="link" data-act="to-admin">선생님 로그인</button></p></main>';
+}
+function viewPick() {
+  return '<main class="narrow">' + masthead('같은 이름의 학생이 있습니다. 본인을 선택해 주세요.') +
+    '<div class="sheet stack">' + L.matches.map(function (m) {
+      return '<button class="btn choice" data-act="pick" data-id="' + h(m.id) + '" data-label="' + h(m.label) + '">' + h(m.label) + '</button>';
+    }).join('') + '<button class="link" data-act="back-login">이름 다시 입력하기</button></div></main>';
+}
+function viewPw() {
+  return '<main class="narrow">' + masthead(h(L.pick.label) + ' 학생, 비밀번호 4자리를 입력해 주세요.') +
+    '<form class="sheet stack" id="f-pw"><label for="in-pw">비밀번호</label>' +
+    '<input id="in-pw" type="password" inputmode="numeric" maxlength="4" autocomplete="current-password" placeholder="••••">' +
+    '<p class="hint">처음 로그인하는 경우 0000을 입력하세요.</p>' + (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') +
+    '<button class="btn primary" type="submit">로그인</button><button class="link" type="button" data-act="back-login">본인이 아닙니다</button></form></main>';
+}
+function viewChange() {
+  return '<main class="narrow">' + masthead('처음 로그인했으니 비밀번호를 먼저 바꿔 주세요.') +
+    '<form class="sheet stack" id="f-change"><label for="in-new">새 비밀번호 (숫자 4자리)</label>' +
+    '<input id="in-new" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password">' +
+    '<label for="in-new2">한 번 더</label><input id="in-new2" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password">' +
+    '<p class="hint">잊어버리면 선생님께 말씀 드리세요. 0000으로 초기화해 드립니다.</p>' +
+    (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') + '<button class="btn primary" type="submit">저장</button></form></main>';
+}
+
+/* ---------- 학생: 홈 ---------- */
+var HOME = null;
+function loadHome() {
+  return api('home', { token: S.token }).then(function (r) {
+    if (!r.ok) { logout(r.error); return; }
+    HOME = r; S.me = r.me; setView('home');
+  });
+}
+function viewHome() {
+  var me = HOME.me, sets = HOME.sets;
+  var open = sets.filter(function (s) { return s.open; }), closed = sets.filter(function (s) { return !s.open; });
+  var entries = HOME.history.map(function (x) { return { items: HOME.items[x.setId] || [], marks: x.marks, setId: x.setId }; });
+  var st = calc(entries);
+  var html = '<main>' + masthead(h(me.school) + ' · ' + h(me.name) + ' <button class="link" data-act="logout">로그아웃</button>', 'sm');
+  html += '<section class="block"><h2>이번 주</h2>';
+  if (!open.length) html += '<p class="empty">지금 제출할 수 있는 클리닉이 없습니다.</p>';
+  html += '<div class="cards">' + open.map(function (s) {
+    return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '"><span class="card-k">' + h(s.week) + '</span><strong>' + h(s.title) + '</strong>' +
+      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? '제출 완료 · ' + s.score + '/' + s.total + ' (수정 가능)' : '미제출 · ' + s.total + '문항') + '</span></button>';
+  }).join('') + '</div></section>';
+
+  html += '<section class="block"><h2>내 약점</h2>';
+  if (!entries.length) html += '<p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 여기에 약점 분석이 나타납니다.</p>';
+  else {
+    var tr = sortedRates(st.type, 3).slice(0, 6), wr = sortedRates(st.work, 3).slice(0, 6);
+    html += '<p class="note">틀린 문제와 찍어서 맞힌 문제를 합쳐서 계산합니다. 지금까지 ' + entries.length + '회, ' + st.total.n + '문항을 풀었습니다.</p>' +
+      '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return barRow(TYPES[o.key] || o.key, o.b, areaOfType(o.key)); }).join('') + '</div>' +
+      '<div><h3>작품</h3>' + wr.map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' + trend(entries) + '</div>';
+  }
+  html += '</section>';
+  if (closed.length) {
+    html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
+      return '<div class="row"><span>' + h(s.week) + '</span><span>' + h(s.title) + '</span><span class="num">' + (s.submitted ? s.score + '/' + s.total : '미제출') + '</span></div>';
+    }).join('') + '</div></section>';
+  }
+  return html + '</main>';
+}
+function trend(entries) {
+  var setMeta = {}; HOME.sets.forEach(function (s) { setMeta[s.id] = s; });
+  var pts = entries.map(function (e) {
+    var n = e.items.length, x = Object.keys(e.marks).filter(function (k) { return e.marks[k] === 'X'; }).length;
+    return { t: (setMeta[e.setId] || {}).createdAt || '', w: (setMeta[e.setId] || {}).week || '', v: n ? (n - x) / n : 0 };
+  }).sort(function (a, b) { return a.t.localeCompare(b.t); });
+  if (pts.length < 2) return '';
+  var W = 320, H = 90, pad = 18;
+  var xs = function (i) { return pad + i * (W - pad * 2) / (pts.length - 1); }, ys = function (v) { return H - 20 - v * (H - 34); };
+  var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(p.v).toFixed(1); }).join(' ');
+  return '<h3>주차별 맞힌 비율</h3><div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="주차별 맞힌 비율">' +
+    '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(1) + '" y2="' + ys(1) + '" class="grid"/><line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(0.5) + '" y2="' + ys(0.5) + '" class="grid"/>' +
+    '<path d="' + path + '" class="line"/>' + pts.map(function (p, i) {
+      return '<circle cx="' + xs(i) + '" cy="' + ys(p.v) + '" r="' + (i === pts.length - 1 ? 4 : 2.5) + '" class="dot"/>' +
+        '<text x="' + xs(i) + '" y="' + (H - 4) + '" text-anchor="middle" class="lbl">' + h(p.w) + '</text>' +
+        '<text x="' + xs(i) + '" y="' + (ys(p.v) - 7) + '" text-anchor="middle" class="val">' + pct(p.v) + '</text>';
+    }).join('') + '</svg></div>';
+}
+
+/* ---------- 학생: 점검표 작성 ---------- */
+var F = null;
+function openSet(id) {
+  api('getSet', { token: S.token, setId: id }).then(function (r) {
+    if (!r.ok) return toast(r.error, true);
+    var sub = r.sub;
+    F = { set: r.set, items: r.items, marks: sub ? Object.assign({}, sub.marks) : {}, follow: sub ? Object.assign({}, sub.follow) : {},
+      homework: sub ? Object.assign({}, sub.homework) : {}, achieve: sub ? sub.achieve : '', message: sub ? sub.message : '', resubmit: !!sub, err: '' };
+    setView('form');
+  });
+}
+function formCounts() {
+  var x = 0, g = 0; Object.keys(F.marks).forEach(function (k) { if (F.marks[k] === 'X') x++; else if (F.marks[k] === 'G') g++; });
+  return { x: x, g: g, ok: F.items.length - x };
+}
+function viewForm() {
+  var set = F.set, c = formCounts();
+  var html = '<main>' + masthead(h(set.title), 'sm') + '<form id="f-sub" class="stack-lg">';
+  if (set.homework.length) {
+    html += '<section class="sheet"><h2>숙제</h2><div class="hw">' + set.homework.map(function (hw, i) {
+      return '<div class="hw-row"><span>' + h(hw) + '</span><div class="seg" role="radiogroup" aria-label="' + h(hw) + '">' +
+        ['done', 'part', 'none'].map(function (v) {
+          return '<button type="button" class="' + (F.homework[hw] === v ? 'on ' + v : '') + '" data-act="hw" data-hw="' + i + '" data-v="' + v + '" aria-pressed="' + (F.homework[hw] === v) + '">' + HW_LABEL[v] + '</button>';
+        }).join('') + '</div></div>';
+    }).join('') + '</div></section>';
+  }
+  html += '<section class="sheet"><h2>복습 테스트</h2><p class="warnline">찍어서 맞힌 문제는 반드시 한 번 더 확인하세요!</p>' +
+    '<p class="note">틀린 번호는 한 번, 찍어서 맞힌 번호는 두 번 누르세요. 세 번 누르면 원래대로 돌아갑니다.</p>' +
+    '<div class="legend"><span><i class="k ok"></i>맞음</span><span><i class="k x"></i>틀림</span><span><i class="k g"></i>찍맞</span></div>' +
+    '<div class="grid-no">' + F.items.map(function (it) {
+      var m = F.marks[it.no] || '';
+      return '<button type="button" class="no ' + (m === 'X' ? 'x' : m === 'G' ? 'g' : '') + '" data-act="mark" data-no="' + it.no + '" aria-label="' + it.no + '번 ' + (m === 'X' ? '틀림' : m === 'G' ? '찍맞' : '맞음') + '">' + it.no + '</button>';
+    }).join('') + '</div><div class="tally"><span>맞힌 개수</span><strong class="num">' + c.ok + ' / ' + F.items.length + '</strong><span class="tally-g">찍맞 ' + c.g + '</span></div></section>';
+
+  var flagged = F.items.filter(function (it) { return F.marks[it.no]; });
+  html += '<section class="sheet"><h2>틀린 문제 정리</h2>';
+  if (!flagged.length) html += '<p class="empty">틀린 문제가 없습니다. 다음으로 넘어가세요.</p>';
+  else html += '<p class="note">문제마다 이해했는지, 질문할 것인지 골라 주세요. 모두 골라야 제출할 수 있습니다.</p><div class="fl">' + flagged.map(function (it) {
+    var f = F.follow[it.no] || '';
+    return '<div class="fl-row"><span class="fl-no ' + (F.marks[it.no] === 'G' ? 'g' : 'x') + '">' + it.no + '</span><span class="fl-meta">' + h(it.work) + '<small>' + it.types.map(function (t) { return h(TYPES[t] || t); }).join(' · ') + '</small></span>' +
+      '<div class="seg"><button type="button" class="' + (f === 'U' ? 'on done' : '') + '" data-act="follow" data-no="' + it.no + '" data-v="U">이해했어요</button>' +
+      '<button type="button" class="' + (f === 'Q' ? 'on q' : '') + '" data-act="follow" data-no="' + it.no + '" data-v="Q">질문할게요</button></div></div>';
+  }).join('') + '</div>';
+  html += '</section>';
+
+  html += '<section class="sheet"><h2>성취도</h2><p class="note">이번 주 자신의 성취도를 스스로 평가해 주세요.</p><div class="seg wide">' + ['상', '중', '하'].map(function (v) {
+    return '<button type="button" class="' + (F.achieve === v ? 'on done' : '') + '" data-act="achieve" data-v="' + v + '">' + v + '</button>';
+  }).join('') + '</div></section>';
+  html += '<section class="sheet"><h2>더 궁금한 내용 / 하고 싶은 말</h2><textarea id="in-msg" rows="4" maxlength="1000" placeholder="없으면 비워 두어도 됩니다">' + h(F.message) + '</textarea></section>';
+  html += (F.err ? '<p class="err">' + h(F.err) + '</p>' : '') +
+    '<div class="actions"><button class="btn" type="button" data-act="home">돌아가기</button><button class="btn primary" type="submit">' + (F.resubmit ? '다시 제출' : '제출') + '</button></div></form></main>';
+  return html;
+}
+function viewDone() {
+  var r = F.result, entries = [{ items: F.items, marks: F.marks }], st = calc(entries);
+  var top = sortedRates(st.type, 2).filter(function (o) { return o.r > 0; }).slice(0, 3);
+  var q = Object.keys(F.follow).filter(function (k) { return F.follow[k] === 'Q'; });
+  return '<main class="narrow">' + masthead('제출이 완료되었습니다.') + '<div class="sheet stack"><div class="big num">' + r.score + '<small> / ' + r.total + '</small></div>' +
+    (top.length ? '<h3>이번 주 많이 틀린 유형</h3>' + top.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '<p class="note">이번 주에는 특별히 약한 유형이 없습니다.</p>') +
+    (q.length ? '<p class="note">질문할 문제: ' + q.join(', ') + '번. 클리닉 시간에 질문해 주세요.</p>' : '') +
+    '<button class="btn primary" data-act="home">처음으로</button></div></main>';
+}
+
+/* ---------- 선생님 ---------- */
+var A = { tab: 'week', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
+function viewAdminLogin() {
+  return '<main class="narrow">' + masthead('선생님 로그인') + '<form class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
+    '<input id="in-apw" type="password" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: demo</p>' : '') +
+    (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') + '<button class="btn primary" type="submit">로그인</button>' +
+    '<button class="link" type="button" data-act="back-login">학생 로그인으로</button></form></main>';
+}
+function loadAdmin() {
+  return api('adminAll', { token: S.token }).then(function (r) {
+    if (!r.ok) { logout(r.error); return; }
+    A.data = r;
+    var d = r;
+    d.stuById = {}; d.students.forEach(function (s) { d.stuById[s.id] = s; });
+    d.setById = {}; d.sets.forEach(function (s) { d.setById[s.id] = s; });
+    d.sets.sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)) || a.school.localeCompare(b.school); });
+    d.schools = Array.from(new Set(d.students.map(function (s) { return s.school; }).concat(d.sets.map(function (s) { return s.school; })))).sort();
+    if (!A.setId || !d.setById[A.setId]) A.setId = d.sets.length ? d.sets[0].id : null;
+    setView('admin');
+  });
+}
+function viewAdmin() {
+  var tabs = [['week', '이번 주'], ['stats', '누적 분석'], ['students', '학생'], ['sets', '클리닉 세트']];
+  var html = '<main class="wide"><header class="abar"><h1><img src="' + MASCOT + '" alt=""> 클리닉 트래커 관리</h1><nav class="tabs">' + tabs.map(function (t) {
+    return '<button class="' + (A.tab === t[0] ? 'on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + '</button>';
+  }).join('') + '</nav><div class="abar-r"><button class="link" data-act="reload">새로고침</button><button class="link" data-act="logout">로그아웃</button></div></header>';
+  if (A.tab === 'week') html += tabWeek();
+  else if (A.tab === 'stats') html += tabStats();
+  else if (A.tab === 'students') html += tabStudents();
+  else html += tabSets();
+  html += '</main>';
+  if (A.detail) html += studentModal(A.detail);
+  return html;
+}
+function subsFor(setId) { return A.data.subs.filter(function (s) { return s.setId === setId; }); }
+function expectedFor(set) {
+  return A.data.students.filter(function (s) { return s.status === 'active' && s.school === set.school && String(s.joinedAt) <= String(set.createdAt); });
+}
+function setOptions(sel) {
+  return A.data.sets.map(function (s) { return '<option value="' + h(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + h(s.school + ' · ' + s.week + (s.open ? '' : ' (마감)')) + '</option>'; }).join('');
+}
+
+function tabWeek() {
+  var d = A.data, set = d.setById[A.setId];
+  if (!set) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  var items = d.items[set.id] || [], subs = subsFor(set.id), exp = expectedFor(set);
+  var subBy = {}; subs.forEach(function (s) { subBy[s.studentId] = s; });
+  var missing = exp.filter(function (s) { return !subBy[s.id]; });
+  var n = items.length;
+  var scores = subs.map(function (s) { return n - Object.keys(s.marks).filter(function (k) { return s.marks[k] === 'X'; }).length; });
+  var avg = scores.length ? scores.reduce(function (a, b) { return a + b; }, 0) / scores.length : 0;
+  var gAvg = subs.length ? subs.reduce(function (a, s) { return a + Object.keys(s.marks).filter(function (k) { return s.marks[k] === 'G'; }).length; }, 0) / subs.length : 0;
+  var qCount = subs.reduce(function (a, s) { return a + Object.keys(s.follow).filter(function (k) { return s.follow[k] === 'Q'; }).length; }, 0);
+
+  var html = '<div class="toolbar"><label for="sel-set">세트</label><select id="sel-set">' + setOptions(set.id) + '</select></div>';
+  var subDone = exp.filter(function (s) { return subBy[s.id]; }).length;
+  html += '<div class="kpis"><div><span>제출</span><strong class="num">' + subDone + '<small> / ' + exp.length + '</small></strong></div>' +
+    '<div><span>평균 맞힌 개수</span><strong class="num">' + avg.toFixed(1) + '<small> / ' + n + '</small></strong></div>' +
+    '<div><span>평균 찍맞</span><strong class="num">' + gAvg.toFixed(1) + '</strong></div>' +
+    '<div><span>질문 들어온 문제</span><strong class="num">' + qCount + '</strong></div></div>';
+  if (missing.length) html += '<section class="block"><h2>미제출 <small>' + missing.length + '명</small></h2><div class="chips">' + missing.map(function (s) { return '<button class="chip todo" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button>'; }).join('') + '</div></section>';
+
+  // 문항별
+  var per = items.map(function (it) {
+    var x = 0, g = 0, q = 0, qn = [];
+    subs.forEach(function (s) { if (s.marks[it.no] === 'X') x++; else if (s.marks[it.no] === 'G') g++; if (s.follow[it.no] === 'Q') { q++; qn.push((d.stuById[s.studentId] || {}).name || '?'); } });
+    return { it: it, x: x, g: g, q: q, qn: qn, r: subs.length ? (x + g) / subs.length : 0 };
+  });
+  var sorted = per.slice().sort(function (a, b) { return b.r - a.r || a.it.no - b.it.no; });
+  var shown = A.showAllItems ? per : sorted.slice(0, 15);
+  html += '<section class="block"><div class="block-h"><h2>문항별 오답률</h2><button class="link" data-act="toggle-items">' + (A.showAllItems ? '많이 틀린 15개만' : '전체 번호순으로') + '</button></div>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>번호</th><th>작품</th><th>유형</th><th class="r">틀림</th><th class="r">찍맞</th><th>오답률</th></tr></thead><tbody>' +
+    shown.map(function (p) {
+      return '<tr><td class="num">' + p.it.no + (p.it.essay ? ' <span class="tag">서술</span>' : '') + '</td><td>' + h(p.it.work) + '</td><td class="muted">' + p.it.types.map(function (t) { return h(TYPES[t] || t); }).join(', ') + '</td>' +
+        '<td class="r num">' + p.x + '</td><td class="r num">' + p.g + '</td><td class="cellbar"><i style="width:' + Math.max(2, p.r * 100) + '%"></i><span>' + pct(p.r) + '</span></td></tr>';
+    }).join('') + '</tbody></table></div></section>';
+
+  // 질문
+  var qs = per.filter(function (p) { return p.q; }).sort(function (a, b) { return b.q - a.q; });
+  var qShown = A.showAllQ ? qs : qs.slice(0, 10);
+  html += '<div class="two"><section class="block"><div class="block-h"><h2>질문할 문제 <small>' + qs.length + '개</small></h2>' + (qs.length > 10 ? '<button class="link" data-act="toggle-q">' + (A.showAllQ ? '많이 나온 10개만' : '전체 보기') + '</button>' : '') + '</div>' + (qs.length ? '<div class="rows">' + qShown.map(function (p) {
+    return '<div class="qrow"><strong class="num">' + p.it.no + '번</strong><span class="muted">' + h(p.it.work) + '</span><span>' + p.qn.map(h).join(', ') + '</span></div>';
+  }).join('') + '</div>' : '<p class="empty">질문 들어온 문제가 없어요.</p>') + '</section>';
+
+  // 숙제
+  html += '<section class="block"><h2>숙제</h2>' + (set.homework.length ? set.homework.map(function (hw) {
+    var c = { done: 0, part: 0, none: 0 }, nones = [];
+    subs.forEach(function (s) { var v = s.homework[hw]; if (c[v] !== undefined) c[v]++; if (v === 'none') nones.push((d.stuById[s.studentId] || {}).name); });
+    return '<div class="hwstat"><strong>' + h(hw) + '</strong><span>다 함 ' + c.done + '</span><span>조금 ' + c.part + '</span><span class="' + (c.none ? 'badtxt' : '') + '">안 함 ' + c.none + '</span>' +
+      (nones.length ? '<small>' + nones.map(h).join(', ') + '</small>' : '') + '</div>';
+  }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
+
+  // 학생별
+  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th><th class="r">찍맞</th><th class="r">질문</th><th>성취도</th><th>하고 싶은 말</th><th>제출</th></tr></thead><tbody>' +
+    subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
+      var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
+      Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
+      Object.keys(s.follow).forEach(function (k) { if (s.follow[k] === 'Q') q++; });
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td><td class="r num">' + g + '</td><td class="r num">' + q + '</td><td>' + h(s.achieve) + '</td><td class="msg">' + h(s.message) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td></tr>';
+    }).join('') + '</tbody></table></div></section>';
+  return html;
+}
+
+function entriesFor(filterFn) {
+  var d = A.data;
+  return d.subs.filter(function (s) { var st = d.stuById[s.studentId], set = d.setById[s.setId]; return st && set && filterFn(st, set); })
+    .map(function (s) { return { items: d.items[s.setId] || [], marks: s.marks, setId: s.setId, studentId: s.studentId }; });
+}
+function heat(b) {
+  if (!b || !b.n) return '<td class="heat empty-c">–</td>';
+  var r = rate(b);
+  return '<td class="heat' + (b.n < 5 ? ' few' : '') + '" style="--r:' + Math.min(1, r * 1.6).toFixed(2) + '"><b>' + pct(r) + '</b><small>' + b.n + '</small></td>';
+}
+function tabStats() {
+  var d = A.data, schools = d.schools;
+  var cols = A.school === '전체' ? schools : [A.school];
+  var all = calc(entriesFor(function (st) { return A.school === '전체' || st.school === A.school; }));
+  var by = {}; cols.forEach(function (sc) { by[sc] = calc(entriesFor(function (st) { return st.school === sc; })); });
+  var html = '<div class="toolbar"><span>학교</span><div class="chips">' + ['전체'].concat(schools).map(function (sc) {
+    return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
+  }).join('') + '</div></div><p class="note">오답률 = (틀림 + 찍맞) ÷ 푼 문항. 칸 아래 작은 숫자는 푼 문항 수, 5개 미만이면 흐리게 표시.</p>';
+  var showCols = A.school === '전체' && cols.length > 1;
+  function table(kind, keys, labelFn, groupFn) {
+    var head = '<tr><th>' + (kind === 'work' ? '작품' : '유형') + '</th>' + (showCols ? '<th class="c">전체</th>' : '') + cols.map(function (c) { return '<th class="c">' + h(c) + '</th>'; }).join('') + '</tr>';
+    var lastG = null;
+    var body = keys.map(function (k) {
+      var g = groupFn ? groupFn(k) : null, sep = '';
+      if (groupFn && g !== lastG) { sep = '<tr class="grp"><td colspan="' + (cols.length + 2) + '">' + h(g) + '</td></tr>'; lastG = g; }
+      return sep + '<tr><td>' + h(labelFn(k)) + '</td>' + (showCols ? heat(all[kind][k]) : '') + cols.map(function (c) { return heat(by[c][kind][k]); }).join('') + '</tr>';
+    }).join('');
+    return '<div class="tscroll"><table class="t heat-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
+  }
+  var workKeys = sortedRates(all.work).map(function (o) { return o.key; });
+  var typeKeys = Object.keys(TYPES).filter(function (t) { return all.type[t]; });
+  html += '<section class="block"><h2>작품별 오답률 <small>높은 순</small></h2>' + (workKeys.length ? table('work', workKeys, function (k) { return k; }) : '<p class="empty">아직 제출된 기록이 없어요.</p>') + '</section>';
+  html += '<section class="block"><h2>유형별 오답률</h2>' + (typeKeys.length ? table('type', typeKeys, function (k) { return TYPES[k]; }, areaOfType) : '<p class="empty">아직 제출된 기록이 없어요.</p>') + '</section>';
+  return html;
+}
+
+function studentSummary(st) {
+  var ents = entriesFor(function (s) { return s.id === st.id; });
+  var c = calc(ents);
+  var weak = sortedRates(c.type, 4).slice(0, 2).map(function (o) { return TYPES[o.key]; });
+  var acc = c.total.n ? (c.total.n - c.total.x) / c.total.n : null;
+  return { n: ents.length, acc: acc, weak: weak, calc: c, ents: ents };
+}
+function tabStudents() {
+  var d = A.data;
+  var list = d.students.filter(function (s) { return (A.school === '전체' || s.school === A.school) && (!A.q || s.name.indexOf(A.q) >= 0); })
+    .sort(function (a, b) { return (a.status === b.status ? 0 : a.status === 'active' ? -1 : 1) || a.school.localeCompare(b.school) || a.name.localeCompare(b.name); });
+  var html = '<section class="block sheet"><h2>학생 추가</h2><p class="note">한 줄에 한 명씩, 이름과 학교를 같이 넣어 주세요. 순서는 상관없고 "동양고"는 "동양"으로 줄여서 저장해요. "김도현(동양)"처럼 괄호를 붙여도 괄호는 빼고 저장되고, 동명이인 구분은 사이트가 알아서 해요. 비밀번호는 0000으로 시작하고, 첫 로그인 때 학생이 바꿔요.</p>' +
+    '<textarea id="in-add" rows="4" placeholder="김민준&#9;동양고&#10;김지원&#9;경복여고"></textarea><div class="actions"><button class="btn primary" data-act="add-students">추가</button></div>' +
+    (A.addMsg ? '<p class="note">' + h(A.addMsg) + '</p>' : '') + '</section>';
+  html += '<div class="toolbar"><div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
+    return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
+  }).join('') + '</div><input id="in-q" placeholder="이름 검색" value="' + h(A.q) + '"></div>';
+  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교</th><th class="r">제출</th><th class="r">정답률</th><th>약한 유형</th><th>상태</th><th></th></tr></thead><tbody>' +
+    list.map(function (s) {
+      var sm = studentSummary(s), cf = A.confirm && A.confirm.id === s.id ? A.confirm.op : null;
+      return '<tr class="' + (s.status !== 'active' ? 'dim' : '') + '"><td><button class="link" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button></td><td>' + h(s.school) + '</td><td class="r num">' + sm.n + '</td>' +
+        '<td class="r num">' + (sm.acc === null ? '–' : pct(sm.acc)) + '</td><td class="muted">' + h(sm.weak.join(', ')) + '</td>' +
+        '<td>' + (s.status === 'active' ? (s.mustChange ? '<span class="tag">첫 로그인 전</span>' : '') : '<span class="tag">퇴원</span>') + '</td><td class="acts">' +
+        '<button class="mini' + (cf === 'reset' ? ' arm' : '') + '" data-act="st-op" data-op="reset" data-id="' + s.id + '">' + (cf === 'reset' ? '한 번 더 누르면 0000' : '비번 초기화') + '</button>' +
+        (s.status === 'active' ? '<button class="mini' + (cf === 'leave' ? ' arm' : '') + '" data-act="st-op" data-op="leave" data-id="' + s.id + '">' + (cf === 'leave' ? '한 번 더 누르면 퇴원' : '퇴원') + '</button>'
+          : '<button class="mini" data-act="st-op" data-op="return" data-id="' + s.id + '">복귀</button>') + '</td></tr>';
+    }).join('') + '</tbody></table></div>';
+  return html;
+}
+function studentModal(id) {
+  var d = A.data, st = d.stuById[id]; if (!st) return '';
+  var sm = studentSummary(st);
+  var hist = d.sets.filter(function (s) { return s.school === st.school; }).map(function (set) {
+    var sub = d.subs.filter(function (x) { return x.setId === set.id && x.studentId === id; })[0];
+    var n = (d.items[set.id] || []).length;
+    if (String(st.joinedAt) > String(set.createdAt)) return '<tr><td>' + h(set.week) + '</td><td colspan="4" class="muted">합류 전</td></tr>';
+    if (!sub) return '<tr><td>' + h(set.week) + '</td><td colspan="4" class="badtxt">미제출</td></tr>';
+    var x = 0, g = 0, q = [];
+    Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; else g++; });
+    Object.keys(sub.follow).forEach(function (k) { if (sub.follow[k] === 'Q') q.push(k); });
+    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + '</td><td class="r num">' + g + '</td><td class="num">' + (q.join(', ') || '–') + '</td><td class="msg">' + h(sub.message) + '</td></tr>';
+  }).join('');
+  return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
+    '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th><th class="r">찍맞</th><th>질문</th><th>하고 싶은 말</th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
+    (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
+      '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
+    '</div></div>';
+}
+
+/* 세트 */
+function newEdit(set) {
+  var d = A.data;
+  if (set) return { id: set.id, school: set.school, week: set.week, title: set.title, homework: set.homework.join(', '), open: set.open, items: JSON.parse(JSON.stringify(d.items[set.id] || [])), paste: '', err: '' };
+  return { id: null, school: d.schools[0] || '', week: '', title: '', homework: '자습서, 평가문제집, 수국, 자체교재', open: true, items: [], paste: '', err: '' };
+}
+function typeSelect(i, slot, val, area) {
+  var opts = Object.keys(TYPES).filter(function (t) { return !area || areaOfType(t) === area || t === val; });
+  return '<select data-edit="type" data-i="' + i + '" data-slot="' + slot + '" aria-label="' + (i + 1) + '번 유형' + (slot + 1) + '"><option value="">' + (slot ? '(없음)' : '선택') + '</option>' +
+    opts.map(function (t) { return '<option value="' + t + '"' + (t === val ? ' selected' : '') + '>' + h(TYPES[t]) + '</option>'; }).join('') + '</select>';
+}
+function tabSets() {
+  var d = A.data;
+  if (A.edit) return setEditor();
+  var html = '<div class="toolbar"><button class="btn primary" data-act="new-set">새 클리닉 세트</button></div>';
+  if (!d.sets.length) return html + '<p class="empty">아직 세트가 없어요. Claude가 태깅해 준 내용을 붙여 넣어서 만들면 돼요.</p>';
+  html += '<div class="tscroll"><table class="t"><thead><tr><th>학교</th><th>주차</th><th>제목</th><th class="r">문항</th><th class="r">제출</th><th>상태</th><th></th></tr></thead><tbody>' +
+    d.sets.map(function (s) {
+      var cf = A.confirm && A.confirm.id === s.id && A.confirm.op === 'del';
+      return '<tr><td>' + h(s.school) + '</td><td>' + h(s.week) + '</td><td>' + h(s.title) + '</td><td class="r num">' + (d.items[s.id] || []).length + '</td><td class="r num">' + subsFor(s.id).length + '/' + expectedFor(s).length + '</td>' +
+        '<td><button class="chip ' + (s.open ? 'ok' : '') + '" data-act="toggle-open" data-id="' + s.id + '">' + (s.open ? '받는 중' : '마감') + '</button></td>' +
+        '<td class="acts"><button class="mini" data-act="edit-set" data-id="' + s.id + '">편집</button><button class="mini' + (cf ? ' arm' : '') + '" data-act="del-set" data-id="' + s.id + '">' + (cf ? '한 번 더 누르면 삭제(제출 기록 포함)' : '삭제') + '</button></td></tr>';
+    }).join('') + '</tbody></table></div><p class="note">학생 화면에는 "받는 중"인 세트만 이번 주로 떠요. 지난주 세트는 마감해 두면 지난 클리닉으로 내려가요.</p>';
+  return html;
+}
+function setEditor() {
+  var e = A.edit, d = A.data;
+  var works = Array.from(new Set(Object.keys(d.items).reduce(function (a, k) { return a.concat(d.items[k].map(function (it) { return it.work; })); }, []).filter(Boolean))).sort();
+  var html = '<section class="sheet stack"><div class="block-h"><h2>' + (e.id ? '세트 편집' : '새 클리닉 세트') + '</h2><button class="link" data-act="cancel-edit">취소</button></div>' +
+    '<div class="form-grid"><label>학교<input id="e-school" list="dl-school" value="' + h(e.school) + '"></label><label>주차<input id="e-week" value="' + h(e.week) + '" placeholder="7주차"></label>' +
+    '<label class="span2">제목<input id="e-title" value="' + h(e.title) + '" placeholder="비우면 학교+주차"></label><label class="span2">숙제 항목 (쉼표로 구분)<input id="e-hw" value="' + h(e.homework) + '"></label></div>' +
+    '<datalist id="dl-school">' + d.schools.map(function (s) { return '<option value="' + h(s) + '">'; }).join('') + '</datalist>' +
+    '<datalist id="dl-work">' + works.map(function (w) { return '<option value="' + h(w) + '">'; }).join('') + '</datalist>' +
+    '<details' + (e.items.length ? '' : ' open') + '><summary>Claude가 만든 태그 붙여 넣기</summary><p class="note">Claude한테 클리닉 파일 주면 이 칸에 넣을 내용을 만들어 줘요. 붙여 넣고 "불러오기"를 누르면 아래 표가 채워져요.</p>' +
+    '<textarea id="e-paste" rows="5">' + h(e.paste) + '</textarea><div class="actions"><button class="btn" data-act="import-tags">불러오기</button></div></details>' +
+    '<div class="block-h"><h3>문항 ' + e.items.length + '개</h3><div class="inline"><label for="e-count">문항 수</label><input id="e-count" type="number" min="1" max="200" value="' + (e.items.length || '') + '" class="short"><button class="mini" data-act="set-count">맞추기</button></div></div>' +
+    '<div class="tscroll"><table class="t edit-t"><thead><tr><th>번호</th><th>작품</th><th>영역</th><th>유형 1</th><th>유형 2</th><th>서술형</th></tr></thead><tbody>' +
+    e.items.map(function (it, i) {
+      return '<tr><td class="num">' + (i + 1) + '</td><td><input data-edit="work" data-i="' + i + '" list="dl-work" value="' + h(it.work) + '" aria-label="' + (i + 1) + '번 작품"></td>' +
+        '<td><select data-edit="area" data-i="' + i + '" aria-label="' + (i + 1) + '번 영역"><option value=""></option>' + AREAS.map(function (a) { return '<option' + (it.area === a[0] ? ' selected' : '') + '>' + a[0] + '</option>'; }).join('') + '</select></td>' +
+        '<td>' + typeSelect(i, 0, it.types[0], it.area) + '</td><td>' + typeSelect(i, 1, it.types[1], it.area) + '</td>' +
+        '<td class="c"><input type="checkbox" data-edit="essay" data-i="' + i + '"' + (it.essay ? ' checked' : '') + ' aria-label="' + (i + 1) + '번 서술형"></td></tr>';
+    }).join('') + '</tbody></table></div>' +
+    (e.err ? '<p class="err">' + h(e.err) + '</p>' : '') +
+    '<div class="actions"><label class="inline"><input type="checkbox" id="e-open"' + (e.open ? ' checked' : '') + '> 바로 받기 시작</label><button class="btn primary" data-act="save-set">저장</button></div></section>';
+  return html;
+}
+function readEditHeader() {
+  var e = A.edit;
+  e.school = $('#e-school').value.trim(); e.week = $('#e-week').value.trim(); e.title = $('#e-title').value.trim();
+  e.homework = $('#e-hw').value; e.open = $('#e-open').checked; e.paste = $('#e-paste').value;
+}
+function parseTags(text) {
+  text = String(text || '').trim();
+  if (!text) throw new Error('붙여 넣은 내용이 비어 있어요.');
+  var obj = JSON.parse(text);
+  var items = Array.isArray(obj) ? obj : obj.items;
+  if (!Array.isArray(items)) throw new Error('items 목록을 찾지 못했어요.');
+  return { meta: Array.isArray(obj) ? {} : obj, items: items.map(function (it) {
+    var types = (it.types || []).filter(function (t) { return TYPES[t]; }).slice(0, 2);
+    return { no: it.no, work: it.work || '', area: it.area || (types[0] ? areaOfType(types[0]) : ''), types: types, essay: !!it.essay };
+  }) };
+}
+
+function shortSchool(t) { return String(t || '').trim().replace(/\d+$/, '').replace(/(여자고등학교|고등학교|여고|고)$/, ''); }
+function parseRosterLine(line, known) {
+  var toks = line.split(/[\t,]+|\s+/).filter(Boolean);
+  var isSchool = function (t) { return /(여자고등학교|고등학교|여고|고)\d*$/.test(t) || /^[가-힣]{2,}\d+$/.test(t) || (known || []).indexOf(t) >= 0 || (known || []).indexOf(shortSchool(t)) >= 0; };
+  var si = -1;
+  toks.forEach(function (t, i) { if (si < 0 && isSchool(t.replace(/\(.*?\)$/, ''))) si = i; });
+  if (si < 0 && toks.length >= 2) si = 0;
+  var school = si >= 0 ? shortSchool(toks[si]) : '';
+  var name = toks.filter(function (t, i) { return i !== si; }).join('').replace(/\(.*?\)$/, '');
+  return { school: school, name: name, raw: line };
+}
+
+/* ---------- 이벤트 ---------- */
+function logout(msg) {
+  if (S.role === 'student' && S.token) { /* 토큰은 서버에서 6시간 뒤 만료 */ }
+  S.token = null; S.role = null; S.me = null; store_set('token', null); store_set('role', null);
+  L = { name: '', matches: [], pick: null, err: msg || '' }; A.data = null; A.detail = null; A.edit = null;
+  setView('login');
+}
+function lookup(name) {
+  L.name = name; L.err = '';
+  return api('lookup', { name: name }).then(function (r) {
+    if (!r.ok) { L.err = r.error; return render(); }
+    L.matches = r.matches;
+    if (r.matches.length === 1) { L.pick = r.matches[0]; setView('pw'); } else setView('pick');
+  });
+}
+function studentLogin(pw) {
+  return api('login', { id: L.pick.id, pw: pw }).then(function (r) {
+    if (!r.ok) { L.err = r.error; return render(); }
+    S.token = r.token; S.role = 'student'; S.me = r.me; store_set('token', r.token); store_set('role', 'student'); L.err = '';
+    if (r.me.mustChange) setView('change'); else loadHome();
+  });
+}
+function adminLogin(pw) {
+  return api('adminLogin', { pw: pw }).then(function (r) {
+    if (!r.ok) { L.err = r.error; return render(); }
+    S.token = r.token; S.role = 'admin'; store_set('token', r.token); store_set('role', 'admin'); L.err = '';
+    loadAdmin();
+  });
+}
+
+function onClick(ev) {
+  var t = ev.target.closest('[data-act]');
+  if (!t) return;
+  if (t.dataset.act === 'close-modal' && ev.target.closest('[data-stop]') && !ev.target.closest('button[data-act="close-modal"]')) return;
+  var act = t.dataset.act, id = t.dataset.id;
+  if (act === 'demo-student') { L.name = '김지원'; lookup('김지원'); return; }
+  if (act === 'demo-admin') { adminLogin('demo'); return; }
+  if (act === 'to-admin') { L.err = ''; setView('admin-login'); return; }
+  if (act === 'back-login') { L.err = ''; setView('login'); return; }
+  if (act === 'pick') { L.pick = { id: id, label: t.dataset.label }; L.err = ''; setView('pw'); return; }
+  if (act === 'logout') { logout(); return; }
+  if (act === 'home') { loadHome(); return; }
+  if (act === 'open-set') { openSet(id); return; }
+  if (F && S.view === 'form') {
+    keepMsg();
+    if (act === 'mark') { var no = t.dataset.no, m = F.marks[no]; if (!m) F.marks[no] = 'X'; else if (m === 'X') F.marks[no] = 'G'; else { delete F.marks[no]; delete F.follow[no]; } return renderKeep(); }
+    if (act === 'follow') { F.follow[t.dataset.no] = t.dataset.v; return renderKeep(); }
+    if (act === 'hw') { F.homework[F.set.homework[Number(t.dataset.hw)]] = t.dataset.v; return renderKeep(); }
+    if (act === 'achieve') { F.achieve = t.dataset.v; return renderKeep(); }
+  }
+  // 선생님
+  if (act === 'tab') { A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
+  if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔어요.'); }); return; }
+  if (act === 'school') { A.school = t.dataset.v; return render(); }
+  if (act === 'toggle-q') { A.showAllQ = !A.showAllQ; return render(); }
+  if (act === 'toggle-items') { A.showAllItems = !A.showAllItems; return render(); }
+  if (act === 'detail') { A.detail = id; return render(); }
+  if (act === 'close-modal') { A.detail = null; return render(); }
+  if (act === 'st-op') {
+    var op = t.dataset.op;
+    if (op !== 'return' && !(A.confirm && A.confirm.id === id && A.confirm.op === op)) { A.confirm = { id: id, op: op }; return render(); }
+    A.confirm = null;
+    api('updateStudent', { token: S.token, id: id, op: op }).then(function (r) {
+      if (!r.ok) return toast(r.error, true);
+      toast(op === 'reset' ? '비밀번호를 0000으로 돌렸어요.' : op === 'leave' ? '퇴원 처리했어요. 기록은 남아 있어요.' : '복귀 처리했어요.');
+      loadAdmin();
+    });
+    return;
+  }
+  if (act === 'add-students') {
+    var lines = $('#in-add').value.split(/\n/).map(function (l) { return l.trim(); }).filter(Boolean);
+    var parsed = lines.map(function (l) { return parseRosterLine(l, A.data.schools); });
+    var list = parsed.filter(function (x) { return x.school && x.name; });
+    var noSchool = parsed.filter(function (x) { return !x.school; }).map(function (x) { return x.name || x.raw; });
+    if (!list.length) { A.addMsg = '학교와 이름을 한 줄에 한 명씩 넣어 주세요.' + (noSchool.length ? ' 학교가 빠진 줄: ' + noSchool.join(', ') : ''); return render(); }
+    api('addStudents', { token: S.token, list: list }).then(function (r) {
+      if (!r.ok) return toast(r.error, true);
+      A.addMsg = '추가 ' + r.added.length + '명' + (r.skipped.length ? ' · 이미 있어서 건너뜀: ' + r.skipped.join(', ') : '') + (noSchool.length ? ' · 학교가 빠져서 못 넣음: ' + noSchool.join(', ') : '');
+      loadAdmin();
+    });
+    return;
+  }
+  if (act === 'new-set') { A.edit = newEdit(null); return render(); }
+  if (act === 'edit-set') { A.edit = newEdit(A.data.setById[id]); return render(); }
+  if (act === 'cancel-edit') { A.edit = null; return render(); }
+  if (act === 'toggle-open') {
+    var s = A.data.setById[id];
+    api('setOpen', { token: S.token, id: id, open: !s.open }).then(function (r) { if (!r.ok) return toast(r.error, true); loadAdmin(); });
+    return;
+  }
+  if (act === 'del-set') {
+    if (!(A.confirm && A.confirm.id === id && A.confirm.op === 'del')) { A.confirm = { id: id, op: 'del' }; return render(); }
+    A.confirm = null;
+    api('deleteSet', { token: S.token, id: id }).then(function (r) { if (!r.ok) return toast(r.error, true); toast('삭제했어요.'); loadAdmin(); });
+    return;
+  }
+  if (act === 'import-tags') {
+    readEditHeader();
+    try {
+      var p = parseTags(A.edit.paste);
+      A.edit.items = p.items;
+      if (p.meta.school && !A.edit.school) A.edit.school = p.meta.school;
+      if (p.meta.school) A.edit.school = A.edit.school || p.meta.school;
+      if (p.meta.week) A.edit.week = A.edit.week || p.meta.week;
+      if (p.meta.title) A.edit.title = A.edit.title || p.meta.title;
+      if (p.meta.homework) A.edit.homework = p.meta.homework.join(', ');
+      A.edit.err = ''; toast(p.items.length + '문항 불러왔어요. 확인하고 저장하세요.');
+    } catch (e) { A.edit.err = '불러오지 못했어요. Claude가 준 내용을 처음부터 끝까지 그대로 붙여 넣었는지 확인해 주세요. (' + e.message + ')'; }
+    return render();
+  }
+  if (act === 'set-count') {
+    readEditHeader();
+    var n = Math.max(1, Math.min(200, Number($('#e-count').value) || 0));
+    while (A.edit.items.length < n) A.edit.items.push({ work: '', area: '', types: [], essay: false });
+    A.edit.items.length = n;
+    return render();
+  }
+  if (act === 'save-set') {
+    readEditHeader();
+    var e = A.edit;
+    var bad = e.items.map(function (it, i) { return (!it.work || !it.types[0]) ? i + 1 : 0; }).filter(Boolean);
+    if (bad.length) { e.err = '작품이나 유형 1이 빈 문항: ' + bad.slice(0, 12).join(', ') + (bad.length > 12 ? ' …' : '') + '번'; return render(); }
+    api('saveSet', { token: S.token, set: { id: e.id, school: e.school, week: e.week, title: e.title, open: e.open,
+      homework: e.homework.split(',').map(function (x) { return x.trim(); }).filter(Boolean) }, items: e.items }).then(function (r) {
+      if (!r.ok) { e.err = r.error; return render(); }
+      toast('저장했어요.'); A.edit = null; A.setId = r.set.id; loadAdmin();
+    });
+    return;
+  }
+}
+function keepMsg() { var m = $('#in-msg'); if (m && F) F.message = m.value; }
+function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y); }
+
+function onChange(ev) {
+  var t = ev.target;
+  if (t.id === 'sel-set') { A.setId = t.value; A.showAllItems = false; A.showAllQ = false; return render(); }
+  if (t.dataset && t.dataset.edit && A.edit) {
+    var it = A.edit.items[Number(t.dataset.i)];
+    if (t.dataset.edit === 'work') it.work = t.value.trim();
+    if (t.dataset.edit === 'area') { it.area = t.value; it.types = it.types.filter(function (x) { return !it.area || areaOfType(x) === it.area; }); readEditHeader(); return renderKeep(); }
+    if (t.dataset.edit === 'type') { var arr = [it.types[0] || '', it.types[1] || '']; arr[Number(t.dataset.slot)] = t.value; it.types = arr.filter(Boolean); if (!it.area && it.types[0]) { it.area = areaOfType(it.types[0]); readEditHeader(); return renderKeep(); } }
+    if (t.dataset.edit === 'essay') it.essay = t.checked;
+  }
+}
+function onInput(ev) {
+  if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); var pos = ev.target.selectionStart; render(); var q = $('#in-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
+}
+function onSubmit(ev) {
+  ev.preventDefault();
+  var f = ev.target;
+  if (f.id === 'f-name') { var nm = $('#in-name').value.trim(); if (!nm) { L.err = '이름을 입력해 주세요.'; return render(); } lookup(nm); }
+  else if (f.id === 'f-pw') { var pw = $('#in-pw').value; if (!/^\d{4}$/.test(pw)) { L.err = '숫자 4자리를 입력해 주세요.'; return render(); } studentLogin(pw); }
+  else if (f.id === 'f-change') {
+    var a = $('#in-new').value, b = $('#in-new2').value;
+    if (a !== b) { L.err = '두 번 입력한 비밀번호가 서로 다릅니다.'; return render(); }
+    api('changePw', { token: S.token, newPw: a }).then(function (r) {
+      if (!r.ok) { L.err = r.error; return render(); }
+      L.err = ''; toast('비밀번호를 변경했습니다.'); loadHome();
+    });
+  }
+  else if (f.id === 'f-admin') adminLogin($('#in-apw').value);
+  else if (f.id === 'f-sub') {
+    keepMsg();
+    var missHw = F.set.homework.filter(function (x) { return !F.homework[x]; });
+    var missF = Object.keys(F.marks).filter(function (k) { return !F.follow[k]; });
+    if (missHw.length) { F.err = '체크하지 않은 숙제: ' + missHw.join(', '); return renderKeep(); }
+    if (missF.length) { F.err = '이해했어요/질문할게요를 고르지 않은 문제: ' + missF.join(', ') + '번'; return renderKeep(); }
+    if (!F.achieve) { F.err = '성취도를 선택해 주세요.'; return renderKeep(); }
+    F.err = '';
+    api('submit', { token: S.token, setId: F.set.id, marks: F.marks, follow: F.follow, homework: F.homework, achieve: F.achieve, message: F.message }).then(function (r) {
+      if (!r.ok) { F.err = r.error; return renderKeep(); }
+      F.result = r; setView('done');
+    });
+  }
+}
+function afterRender() {
+  var first = root.querySelector('#in-name, #in-pw, #in-new, #in-apw');
+  if (first && !('ontouchstart' in window)) first.focus();
+}
+
+function boot() {
+  root = document.getElementById('app');
+  document.addEventListener('click', onClick);
+  document.addEventListener('change', onChange);
+  document.addEventListener('input', onInput);
+  document.addEventListener('submit', onSubmit);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.detail) { A.detail = null; render(); } });
+  if (S.token && S.role === 'student' && !IS_DEMO) loadHome();
+  else if (S.token && S.role === 'admin' && !IS_DEMO) loadAdmin();
+  else { S.token = null; S.role = null; render(); }
+}
+boot();
+
+</script>
