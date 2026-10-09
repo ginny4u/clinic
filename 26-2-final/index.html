@@ -1207,6 +1207,19 @@ function onInput(ev) {
   if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
   if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); var pos = ev.target.selectionStart; render(); var q = $('#in-q'); if (q) { q.focus(); q.setSelectionRange(pos, pos); } }
 }
+/* 한글 입력 중(조합 중)인 마지막 글자가 빠지지 않게: 입력칸을 먼저 확정시킨 뒤 처리 */
+function flushIme(ev, fn) {
+  var ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName) && ae !== ev.target) { ae.blur(); setTimeout(fn, 0); }
+  else fn();
+}
+function onClickSafe(ev) { if (!ev.target.closest('[data-act]')) return; flushIme(ev, function () { onClick(ev); }); }
+function onSubmitSafe(ev) {
+  ev.preventDefault();
+  var ae = document.activeElement;
+  if (ae && /^(INPUT|TEXTAREA)$/.test(ae.tagName)) { ae.blur(); setTimeout(function () { onSubmit(ev); }, 0); }
+  else onSubmit(ev);
+}
 function onSubmit(ev) {
   ev.preventDefault();
   var f = ev.target;
@@ -1246,10 +1259,10 @@ function afterRender() {
 
 function boot() {
   root = document.getElementById('app');
-  document.addEventListener('click', onClick);
+  document.addEventListener('click', onClickSafe);
   document.addEventListener('change', onChange);
   document.addEventListener('input', onInput);
-  document.addEventListener('submit', onSubmit);
+  document.addEventListener('submit', onSubmitSafe);
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && A.detail) { A.detail = null; render(); } });
   if (S.token && S.role === 'student' && !IS_DEMO) loadHome();
   else if (S.token && S.role === 'admin' && !IS_DEMO) loadAdmin();
