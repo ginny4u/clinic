@@ -1061,7 +1061,7 @@ function resultRowsForDay(day, school) {
       Object.keys(sub.follow).forEach(function (k2) { if (sub.follow[k2] === 'Q') q.push(k2); });
     }
     return { set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks) : [] };
-  }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school) || a.st.name.localeCompare(b.st.name); });
+  }).filter(Boolean).sort(function (a, b) { return a.st.name.localeCompare(b.st.name, 'ko') || a.st.school.localeCompare(b.st.school, 'ko'); });
 }
 var MARK = { A: '○', B: '△', F: '✕' };
 function fullSchool(sc) { return sc === '경복' ? '경복여고' : /고$/.test(sc) ? sc : sc + '고'; }
@@ -1101,10 +1101,10 @@ function tabToday() {
         '<textarea id="note-' + h(sc) + '" data-note="' + h(sc) + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(A.day, sc)) + '</textarea>';
     }).join('') + '</section>';
   html += '<div class="actions"><button class="btn" data-act="copy-all">문자 문구 전체 복사</button></div>';
-  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제</th><th class="r">복습 테스트</th><th class="r">찍맞</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
+  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th><th class="r">찍맞</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
     rows.map(function (r) {
       return '<tr><td><button class="link" data-act="detail" data-id="' + r.st.id + '">' + h(r.st.name) + '</button></td><td class="muted">' + h(r.st.school + ' · ' + r.set.week) + '</td>' +
-        '<td class="num">' + (r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '">' + v + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
+        '<td class="num">' + (r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + '">' + (MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
         '<td class="r num">' + (r.sub ? r.score + '/' + r.n : '<span class="badtxt">미제출</span>') + '</td><td class="r num">' + (r.sub ? r.guess : '') + '</td>' +
         '<td class="muted">' + h(r.weak.join(', ')) + '</td><td class="num">' + h(r.q.join(', ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
