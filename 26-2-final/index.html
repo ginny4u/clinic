@@ -1132,7 +1132,7 @@ function setEditor() {
   var e = A.edit, d = A.data;
   var works = Array.from(new Set(Object.keys(d.items).reduce(function (a, k) { return a.concat(d.items[k].map(function (it) { return it.work; })); }, []).filter(Boolean))).sort();
   var html = '<section class="sheet stack"><div class="block-h"><h2>' + (e.id ? '세트 편집' : '새 클리닉 세트') + '</h2><button class="link" data-act="cancel-edit">취소</button></div>' +
-    '<div class="form-grid"><label>학교<input id="e-school" list="dl-school" value="' + h(e.school) + '"></label><label>주차<input id="e-week" value="' + h(e.week) + '" placeholder="7주차"></label>' +
+    '<div class="form-grid"><label>학교<input id="e-school" list="dl-school" value="' + h(e.school) + '"></label><label>주차<input id="e-week" value="' + h(e.week) + '" placeholder="10.3주"></label>' +
     '<label class="span2">제목<input id="e-title" value="' + h(e.title) + '" placeholder="비우면 학교+주차"></label><label class="span2">숙제 항목 (쉼표로 구분)<input id="e-hw" value="' + h(e.homework) + '"></label></div>' +
     '<datalist id="dl-school">' + d.schools.map(function (s) { return '<option value="' + h(s) + '">'; }).join('') + '</datalist>' +
     '<datalist id="dl-work">' + works.map(function (w) { return '<option value="' + h(w) + '">'; }).join('') + '</datalist>' +
