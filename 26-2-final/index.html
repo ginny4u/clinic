@@ -1095,11 +1095,12 @@ function smsText(r) {
     lines.push('■ 과제 수행 여부');
     r.set.homework.forEach(function (hw) { var g = r.ck && r.ck.grades[hw]; lines.push('- ' + hw + ' : ' + (g ? MARK[g] : '-')); });
   }
+  if (r.set.homework.length) lines.push('');
   lines.push('■ 확인 암기 테스트 성취도');
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
   var note = getNote(r.set).trim();
-  if (note) { lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
+  if (note) { lines.push(''); lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
   return lines.join('\n');
 }
 function tabToday() {
