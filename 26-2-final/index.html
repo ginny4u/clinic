@@ -1104,11 +1104,11 @@ function tabToday() {
         '<textarea id="note-' + h(sc) + '" data-note="' + h(sc) + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(A.day, sc)) + '</textarea>';
     }).join('') + '</section>';
   html += '<section class="sheet stack"><h2>학원관리시스템에 한 번에 넣기</h2>' +
-    '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러요.</li><li>학원관리시스템 클리닉수업관리 화면에서 즐겨찾기 막대의 <b>클리닉 결과 넣기</b>를 눌러요.</li>' +
+    '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러요.</li><li>학원관리시스템 클리닉수업관리 화면에서 북마크 바의 <b>클리닉 결과 넣기</b>를 눌러요.</li>' +
     '<li>뜨는 칸에 Ctrl + V로 붙여 넣고 확인 → 평가 칸이 채워지면 내용을 확인하고 <b>저장</b>을 눌러요.</li></ol>' +
     '<div class="actions"><button class="btn" data-act="copy-all">문자 문구만 전체 복사</button><button class="btn primary" data-act="copy-acad">학원관리시스템용 복사</button></div>' +
-    '<details><summary>처음 한 번만: "클리닉 결과 넣기" 즐겨찾기 만들기</summary>' +
-    '<p class="note">크롬에서 Ctrl + Shift + B를 눌러 즐겨찾기 막대를 켠 뒤, 아래 빨간 버튼을 마우스로 끌어서 즐겨찾기 막대에 놓으면 끝이에요. 끌어지지 않으면 "코드 복사"를 누르고, 즐겨찾기 막대에서 마우스 오른쪽 → 페이지 추가 → 이름은 아무거나, URL 칸에 붙여 넣으세요.</p>' +
+    '<details><summary>처음 한 번만: "클리닉 결과 넣기" 북마크 만들기</summary>' +
+    '<p class="note">웨일·크롬 모두 Ctrl + Shift + B를 누르면 북마크 바가 켜져요. 아래 빨간 버튼을 마우스로 끌어서 북마크 바에 놓으면 끝이에요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "클리닉 결과 넣기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn primary bm" href="' + h(BOOKMARKLET_HREF) + '" onclick="return false">클리닉 결과 넣기</a><button class="btn" data-act="copy-bm">코드 복사</button></div></details></section>';
   html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th><th class="r">찍맞</th><th>약한 유형</th><th>질문</th></tr></thead><tbody>' +
     rows.map(function (r) {
