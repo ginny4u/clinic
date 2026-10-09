@@ -204,6 +204,10 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .seg button.on.gB { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 .seg button.on.gF { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
 .dateinp { width: auto !important; }
+.evalbox { background: var(--sheet); border: 1px solid var(--line); padding: 10px 14px; }
+.evalbox summary small { font-weight: 400; margin-left: 6px; }
+.evalgrid { display: grid; grid-template-columns: minmax(8em, max-content) minmax(0, 1fr); gap: 8px 12px; align-items: center; }
+@media (max-width: 520px) { .evalgrid { grid-template-columns: 1fr; } }
 .ck-extra { flex: 1 1 220px; max-width: 360px; padding: 6px 10px !important; font-size: 0.88rem; }
 .bar-t { position: relative; }
 .bar-t .avg { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); transform: translateX(-1px); }
@@ -1028,6 +1032,14 @@ function tabCheck() {
     '<p class="note">이름 첫 글자나 초성만 쳐도 찾아져요. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워져요. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있어요.</p>';
   if (!d.sets.length) return html + '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
   if (!rows.length) return html + '<p class="empty">받는 중인 세트가 있는 학생이 없어요.</p>';
+  var shownSets = []; rows.forEach(function (r) { if (shownSets.indexOf(r.set) < 0) shownSets.push(r.set); });
+  shownSets.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
+  html += '<details class="evalbox"' + (shownSets.some(function (x) { return x.evalName; }) ? ' open' : '') + '><summary>이번 주 추가 평가 (현대어 해석 시험 등) <small class="muted">' +
+    (shownSets.filter(function (x) { return x.evalName; }).map(function (x) { return x.school + ': ' + x.evalName; }).join(' · ') || '없음') + '</small></summary>' +
+    '<p class="note">추가 평가가 있는 학교만 이름을 쓰면, 그 학교 학생들에게만 A+ / A / B / C / F 버튼이 생겨요. 비우면 버튼이 사라져요.</p><div class="evalgrid">' +
+    shownSets.map(function (x) {
+      return '<label for="evn-' + x.id + '">' + h(fullSchool(x.school) + ' ' + x.week) + '</label><input id="evn-' + x.id + '" data-evname="' + x.id + '" value="' + h(x.evalName || '') + '" placeholder="없으면 비워 두기">';
+    }).join('') + '</div></details>';
   html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
   return html;
 }
@@ -1046,10 +1058,10 @@ function ckRowHtml(st, set) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
         }).join('') + '</div></div>';
       }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없어요.</span>') +
-      '<div class="ck-item ck-ach"><span>' + h(set.evalName || '추가 평가') + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
+      (!set.evalName ? '' : '<div class="ck-item ck-ach"><span>' + h(set.evalName) + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
         var on = extraOf(set.id, st.id) === v;
         return '<button type="button" class="' + (on ? 'on g' + (v === 'A+' || v === 'A' ? 'A' : v === 'F' ? 'F' : 'B') : '') + '" data-act="ach" data-set="' + set.id + '" data-st="' + st.id + '" data-v="' + v + '">' + v + '</button>';
-      }).join('') + '</div></div></div></div>';
+      }).join('') + '</div></div>') + '</div></div>';
 }
 function refreshCkRow(setId, sid) {
   var el = document.getElementById('ck-' + setId + '-' + sid), st = A.data.stuById[sid], set = A.data.setById[setId];
@@ -1130,7 +1142,7 @@ function smsText(r) {
   lines.push('■ 확인 암기 테스트 성취도');
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
-  if (r.extra) { lines.push(''); lines.push('■ ' + (r.set.evalName || '추가 평가') + ' 성취도'); lines.push('- ' + r.extra + ' ( A+ / A / B / C / F)'); }
+  if (r.extra && r.set.evalName) { lines.push(''); lines.push('■ ' + r.set.evalName + ' 성취도'); lines.push('- ' + r.extra + ' ( A+ / A / B / C / F)'); }
   var note = getNote(r.set).trim();
   if (note) { lines.push(''); lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
   return lines.join('\n');
@@ -1152,9 +1164,7 @@ function tabToday() {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
     '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label></div>' +
     setsToday.map(function (set) {
-      return '<label for="evn-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 추가 평가 이름 <small class="muted">(현대어 해석 시험처럼 따로 평가한 주에만 쓰세요)</small></label>' +
-        '<input id="evn-' + set.id + '" data-evname="' + set.id + '" value="' + h(set.evalName || '') + '" placeholder="예: 고전 시가 현대어 해석">' +
-        '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
+      return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
         '<textarea id="note-' + set.id + '" data-note="' + set.id + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(set)) + '</textarea>';
     }).join('') + '</section>';
   html += '<section class="sheet stack"><h2>학원관리시스템에 한 번에 넣기</h2>' +
@@ -1451,7 +1461,10 @@ function refreshSms(school) {
 function onInput(ev) {
   if (ev.target.dataset && ev.target.dataset.evname !== undefined) {
     var sid2 = ev.target.dataset.evname, set2 = A.data.setById[sid2];
-    if (set2) { set2.evalName = ev.target.value.trim(); refreshSms(); queueNoteSave(sid2); }
+    if (set2) {
+      set2.evalName = ev.target.value.trim(); refreshSms(); queueNoteSave(sid2);
+      A.data.students.forEach(function (stx) { if (stx.school === set2.school) refreshCkRow(sid2, stx.id); });
+    }
     return;
   }
   if (ev.target.dataset && ev.target.dataset.note !== undefined) {
