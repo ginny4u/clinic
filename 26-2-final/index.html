@@ -458,7 +458,7 @@ function makeDemoBackend(sampleSet) {
   function fnv(s) { var h = 2166136261; for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return (h >>> 0).toString(16); }
   var cache = {};
   var env = {
-    adminPassword: 'demo',
+    adminPassword: '123456',
     hash: fnv,
     uuid: function () { return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) { var r = Math.random() * 16 | 0; return (c === 'x' ? r : (r & 3 | 8)).toString(16); }); },
     now: function () { return new Date().toISOString(); },
@@ -647,7 +647,7 @@ function render() {
 var L = { name: '', matches: [], pick: null, err: '' };
 function viewLogin() {
   return '<main class="narrow">' + masthead('이름을 입력해 주세요!') +
-    '<form class="sheet stack" id="f-name"><label for="in-name">이름</label>' +
+    '<form novalidate class="sheet stack" id="f-name"><label for="in-name">이름</label>' +
     '<input id="in-name" autocomplete="off" value="' + h(L.name) + '" placeholder="홍길동">' +
     (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') +
     '<button class="btn primary" type="submit">다음</button></form>' +
@@ -661,14 +661,14 @@ function viewPick() {
 }
 function viewPw() {
   return '<main class="narrow">' + masthead(h(L.pick.label) + ' 학생, 비밀번호 4자리를 입력해 주세요.') +
-    '<form class="sheet stack" id="f-pw"><label for="in-pw">비밀번호</label>' +
+    '<form novalidate class="sheet stack" id="f-pw"><label for="in-pw">비밀번호</label>' +
     '<input id="in-pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="••••">' +
     '<p class="hint">처음 로그인하는 경우 0000을 입력하세요.</p>' + (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') +
     '<button class="btn primary" type="submit">로그인</button><button class="link" type="button" data-act="back-login">본인이 아닙니다</button></form></main>';
 }
 function viewChange() {
   return '<main class="narrow">' + masthead('처음 로그인했으니 비밀번호를 먼저 바꿔 주세요.') +
-    '<form class="sheet stack" id="f-change"><label for="in-new">새 비밀번호 (숫자 4자리)</label>' +
+    '<form novalidate class="sheet stack" id="f-change"><label for="in-new">새 비밀번호 (숫자 4자리)</label>' +
     '<input id="in-new" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password">' +
     '<label for="in-new2">한 번 더</label><input id="in-new2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="new-password">' +
     '<p class="hint">잊어버리면 선생님께 말씀 드리세요. 0000으로 초기화해 드립니다.</p>' +
@@ -748,7 +748,7 @@ function formCounts() {
 }
 function viewForm() {
   var set = F.set, c = formCounts();
-  var html = '<main>' + masthead(h(set.title), 'sm') + '<form id="f-sub" class="stack-lg">';
+  var html = '<main>' + masthead(h(set.title), 'sm') + '<form novalidate id="f-sub" class="stack-lg">';
   if (set.homework.length) {
     html += '<section class="sheet"><h2>숙제</h2><div class="hw">' + set.homework.map(function (hw, i) {
       return '<div class="hw-row"><span>' + h(hw) + '</span><div class="seg" role="radiogroup" aria-label="' + h(hw) + '">' +
@@ -797,8 +797,8 @@ function viewDone() {
 /* ---------- 선생님 ---------- */
 var A = { tab: 'week', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
 function viewAdminLogin() {
-  return '<main class="narrow">' + masthead('선생님 로그인') + '<form class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
-    '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: demo</p>' : '') +
+  return '<main class="narrow">' + masthead('선생님 로그인') + '<form novalidate class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
+    '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: 123456</p>' : '') +
     (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') + '<button class="btn primary" type="submit">로그인</button>' +
     '<button class="link" type="button" data-act="back-login">학생 로그인으로</button></form></main>';
 }
@@ -1095,7 +1095,7 @@ function onClick(ev) {
   if (t.dataset.act === 'close-modal' && ev.target.closest('[data-stop]') && !ev.target.closest('button[data-act="close-modal"]')) return;
   var act = t.dataset.act, id = t.dataset.id;
   if (act === 'demo-student') { L.name = '김지원'; lookup('김지원'); return; }
-  if (act === 'demo-admin') { adminLogin('demo'); return; }
+  if (act === 'demo-admin') { adminLogin('123456'); return; }
   if (act === 'to-admin') { L.err = ''; setView('admin-login'); return; }
   if (act === 'back-login') { L.err = ''; setView('login'); return; }
   if (act === 'pick') { L.pick = { id: id, label: t.dataset.label }; L.err = ''; setView('pw'); return; }
@@ -1210,6 +1210,10 @@ function onInput(ev) {
 function onSubmit(ev) {
   ev.preventDefault();
   var f = ev.target;
+  if (f.dataset.busy) return; // 엔터와 클릭이 겹쳐 두 번 보내지는 것 막기
+  f.dataset.busy = '1';
+  var sb = f.querySelector('button[type="submit"]');
+  if (sb) { sb.disabled = true; sb.dataset.label = sb.textContent; sb.textContent = '확인 중…'; }
   if (f.id === 'f-name') { var nm = $('#in-name').value.trim(); if (!nm) { L.err = '이름을 입력해 주세요.'; return render(); } lookup(nm); }
   else if (f.id === 'f-pw') { var pw = $('#in-pw').value; if (!/^\d{4}$/.test(pw)) { L.err = '숫자 4자리를 입력해 주세요.'; return render(); } studentLogin(pw); }
   else if (f.id === 'f-change') {
