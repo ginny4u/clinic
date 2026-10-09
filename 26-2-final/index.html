@@ -466,7 +466,7 @@ var CORE_ACTIONS = {
     var set = { id: old ? old.id : 'C' + env.uuid().replace(/-/g, '').slice(0, 10), school: String(s.school).trim(),
       week: String(s.week).trim(), title: String(s.title || (s.school + ' ' + s.week)).trim(),
       homework: (Array.isArray(s.homework) ? s.homework : []).map(function (h) { return String(h).trim(); }).filter(Boolean),
-      open: s.open === undefined ? true : !!s.open, createdAt: old ? old.createdAt : env.now() };
+      open: s.open === undefined ? true : !!s.open, createdAt: old ? old.createdAt : env.now(), note: old ? (old.note || '') : '' };
     store.putSet(set);
     store.putItems(set.id, items);
     return { ok: true, set: set };
@@ -486,6 +486,14 @@ var CORE_ACTIONS = {
       store.putCheck(c); saved.push(c);
     });
     return { ok: true, saved: saved };
+  },
+
+  saveNote: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var set = store.sets().filter(function (x) { return x.id === req.setId; })[0];
+    if (!set) return fail('세트를 찾을 수 없어요.');
+    set.note = String(req.note || '').slice(0, 1500); store.putSet(set);
+    return { ok: true };
   },
 
   setOpen: function (req, store, env) {
@@ -1068,8 +1076,18 @@ function resultRowsForDay(day, school) {
 }
 var MARK = { A: '○', B: '△', F: '✕' };
 function fullSchool(sc) { return sc === '경복' ? '경복여고' : /고$/.test(sc) ? sc : sc + '고'; }
-function noteKey(day, school) { return 'note.' + day + '.' + school; }
-function getNote(day, school) { var k = noteKey(day, school); if (A.notes[k] === undefined) A.notes[k] = store_get(k) || ''; return A.notes[k]; }
+function getNote(set) { return set.note || ''; }
+var noteTimer = {};
+function queueNoteSave(setId) {
+  clearTimeout(noteTimer[setId]);
+  noteTimer[setId] = setTimeout(function () {
+    var set = A.data.setById[setId]; if (!set) return;
+    var st = $('#note-st-' + setId); if (st) st.textContent = '저장 중…';
+    api('saveNote', { token: S.token, setId: setId, note: set.note || '' }).then(function (r) {
+      var st2 = $('#note-st-' + setId); if (st2) { st2.textContent = r.ok ? '저장됨' : '저장 실패'; st2.className = r.ok ? 'oktxt' : 'badtxt'; }
+    });
+  }, 900);
+}
 function smsText(r) {
   var exam = A.exam || '기말고사';
   var lines = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']', ''];
@@ -1080,7 +1098,7 @@ function smsText(r) {
   lines.push('■ 확인 암기 테스트 성취도');
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
-  var note = getNote(A.day, r.st.school).trim();
+  var note = getNote(r.set).trim();
   if (note) { lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
   return lines.join('\n');
 }
@@ -1095,13 +1113,14 @@ function tabToday() {
     }).join('') + '</div></div>';
   html += '<p class="note">이 날짜에 숙제 검사를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
-  var schoolsToday = Array.from(new Set(rows.map(function (r) { return r.st.school; }))).sort();
+  var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
+  setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
     '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label></div>' +
-    schoolsToday.map(function (sc) {
-      return '<label for="note-' + h(sc) + '">' + h(fullSchool(sc)) + ' 클리닉 진행 사항 <small class="muted">(이 학교 학생들 문자에 똑같이 들어가요)</small></label>' +
-        '<textarea id="note-' + h(sc) + '" data-note="' + h(sc) + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(A.day, sc)) + '</textarea>';
+    setsToday.map(function (set) {
+      return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
+        '<textarea id="note-' + set.id + '" data-note="' + set.id + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(set)) + '</textarea>';
     }).join('') + '</section>';
   html += '<section class="sheet stack"><h2>학원관리시스템에 한 번에 넣기</h2>' +
     '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러요.</li><li>학원관리시스템 클리닉수업관리 화면에서 북마크 바의 <b>클리닉 결과 넣기</b>를 눌러요.</li>' +
@@ -1386,8 +1405,9 @@ function refreshSms(school) {
 }
 function onInput(ev) {
   if (ev.target.dataset && ev.target.dataset.note !== undefined) {
-    var sc = ev.target.dataset.note, k = noteKey(A.day, sc);
-    A.notes[k] = ev.target.value; store_set(k, ev.target.value); refreshSms(sc); return;
+    var sid = ev.target.dataset.note, set = A.data.setById[sid];
+    if (set) { set.note = ev.target.value; refreshSms(); queueNoteSave(sid); var st = $('#note-st-' + sid); if (st) { st.textContent = ''; } }
+    return;
   }
   if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
   if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); applyFilter(); return; }
