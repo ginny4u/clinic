@@ -244,6 +244,8 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .cklist.one .ck-name strong { font-size: 1.3rem; }
 .smslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .sms { background: var(--sheet); border: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.sms textarea { width: 100%; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
+.fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
@@ -938,7 +940,7 @@ function omrSheet() {
     return '<div class="orow">' + head + '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="ess" data-no="' + it.no + '" aria-pressed="' + x + '">' + (x ? '틀림' : '맞음') + '</button></div></div>';
   }).join('');
   return '<section class="sheet"><h2>복습 테스트</h2><p class="note">세트마다 내가 고른 번호를 <b>모두</b> 누르세요. 다시 누르면 취소돼요. ' +
-    '서술형은 모범답안과 비교해서 틀렸으면 눌러서 "틀림"으로 바꾸세요. 제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없어요.</p>' +
+    (F.items.some(function (it) { return it.essay; }) ? '서술형은 모범답안과 비교해서 틀렸으면 눌러서 "틀림"으로 바꾸세요. ' : '') + '제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없어요.</p>' +
     '<div class="omr">' + rows + '</div><div class="tally"><span>답을 고른 문항</span><strong class="num">' + done + ' / ' + need + '</strong></div></section>';
 }
 function resultBlocks(r) {
@@ -985,7 +987,7 @@ function viewDone() {
 }
 
 /* ---------- 선생님 ---------- */
-var A = { extras: {}, notes: {}, exam: store_get('exam') || '기말고사', addWeak: false, tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
+var A = { extras: {}, notes: {}, exam: store_get('exam') || '기말고사', addWeak: false, addFb: store_get('addFb') !== '0', fbEdit: {}, tab: 'check', grades: {}, dirty: {}, saving: {}, day: '', ckSchool: '', ckQ: '', data: null, setId: null, school: '전체', q: '', detail: null, edit: null, confirm: null, addMsg: '', showAllItems: false };
 function viewAdminLogin() {
   return '<main class="narrow">' + masthead('선생님 로그인') + '<form novalidate class="sheet stack" id="f-admin"><label for="in-apw">비밀번호</label>' +
     '<input id="in-apw" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password">' + (IS_DEMO ? '<p class="hint">미리보기 비밀번호: 123456</p>' : '') +
@@ -1336,6 +1338,103 @@ function queueNoteSave(setId) {
     });
   }, 900);
 }
+/* ---------- 학생별 클리닉 피드백 (학부모 문자용, 규칙 기반) ---------- */
+var FB_TYPE = {
+  L1: '작품의 내용과 주제를 파악하는', L2: '시어와 구절의 의미를 해석하는', L3: '표현상·서술상 특징을 판단하는',
+  L4: '화자와 인물의 태도·심리를 파악하는', L5: '〈보기〉의 관점을 작품에 적용하는', L6: '여러 작품을 비교하는',
+  L7: '고전 어휘와 구절을 해석하는', G1: '중세 국어의 특징을 파악하는', G2: '품사와 단어의 짜임을 구분하는',
+  G3: '문장 성분과 문장의 짜임을 분석하는', G4: '높임·시제·피동 같은 문법 요소를 판단하는', G5: '음운 변동과 맞춤법을 적용하는',
+  R1: '글의 세부 내용을 확인하고 추론하는', R2: '글의 구조와 전개 방식을 파악하는', R3: '관점을 비교하고 〈보기〉에 적용하는',
+  R4: '어휘의 문맥적 의미를 파악하는', M1: '화법·작문·매체 자료를 분석하는'
+};
+function fbJosa(w, a, b) { var c = String(w).charCodeAt(String(w).length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; }
+function fbWork(w, area) { return area === '문학' ? '「' + w + '」' : '\'' + w + '\''; }
+function fbGiven(name) { name = String(name || ''); return name.length === 3 ? name.slice(1) : name; }
+function fbPick(seed, arr) { var x = 0; for (var i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) % 9973; return arr[x % arr.length]; }
+
+function feedbackFor(set, sub, d) {
+  var items = d.items[set.id] || [], n = items.length; if (!n || !sub) return '';
+  var st = d.stuById[sub.studentId] || {}, who = fbGiven(st.name) + ' 학생은', seed = sub.studentId + set.id;
+  var X = function (it) { return sub.marks[it.no] === 'X'; };
+  var wrong = items.filter(X), rate = (n - wrong.length) / n;
+  var out = [];
+
+  // 1. 오답이 몰린 작품 (맞은 개수는 문자 위쪽 '성취도'에 따로 나가므로 여기서는 쓰지 않음)
+  if (!wrong.length) {
+    out.push(who + ' 이번 주 확인 테스트를 모두 맞혀 범위 내용을 정확하게 이해하고 있습니다.');
+  } else {
+    var byWork = {};
+    items.forEach(function (it) { var b = byWork[it.work] || (byWork[it.work] = { n: 0, x: 0, area: it.area }); b.n++; if (X(it)) b.x++; });
+    var works = Object.keys(byWork).map(function (k) { return { w: k, b: byWork[k] }; }).filter(function (o) { return o.b.x; })
+      .sort(function (a, b) { return b.b.x - a.b.x || b.b.x / b.b.n - a.b.x / a.b.n; });
+    var top = works[0];
+    if (wrong.length <= 2) {
+      out.push(who + ' 이번 주 오답이 ' + works.map(function (o) { return fbWork(o.w, o.b.area); }).join(', ') + ' ' + wrong.length + '문항에 그쳐 전반적으로 안정적입니다.');
+    } else if (top.b.x >= 2 && top.b.x / wrong.length >= 0.4) {
+      var w2 = works[1] && works[1].b.x >= 2 && works[1].b.x / wrong.length >= 0.3 ? works[1] : null;
+      out.push(who + ' 이번 주 ' + fbWork(top.w, top.b.area) + (w2 ? fbJosa(top.w, '과', '와') + ' ' + fbWork(w2.w, w2.b.area) : '') + ' 문항에서 오답이 집중되었습니다.');
+    } else {
+      out.push(who + ' 이번 주 오답이 한 작품에 몰리지 않고 여러 작품에 고르게 나타났습니다.');
+    }
+  }
+
+  // 2. 약한 유형 (이번 세트 안에서 2문항 이상 틀리고 정답률이 낮은 유형)
+  var byType = {};
+  items.forEach(function (it) { (it.types || []).forEach(function (t) { var b = byType[t] || (byType[t] = { n: 0, x: 0 }); b.n++; if (X(it)) b.x++; }); });
+  var weakT = Object.keys(byType).filter(function (t) { var b = byType[t]; return b.x >= 2 && b.x / b.n >= 0.4 && FB_TYPE[t]; })
+    .sort(function (a, b) { return byType[b].x / byType[b].n - byType[a].x / byType[a].n || byType[b].x - byType[a].x; }).slice(0, 2);
+  if (weakT.length) {
+    out.push(fbPick(seed, ['특히 ', '유형별로 보면 ']) + weakT.map(function (t) { return FB_TYPE[t] + ' 문항'; }).join('과 ') +
+      '에서 정확도가 낮았습니다.');
+  }
+
+  // 2-1. 문법 개념 이름 (태그에 concept가 달려 있을 때만)
+  var cons = [];
+  wrong.forEach(function (it) { if (it.area === '문법' && it.concept && cons.indexOf(it.concept) < 0) cons.push(it.concept); });
+  if (cons.length) out.push('문법에서는 ' + cons.slice(0, 2).map(function (c) { return '\'' + c + '\''; }).join(', ') + ' 개념을 다시 정리할 필요가 있습니다.');
+
+  // 3. 무한선지 판단 습관: 옳은 선지를 놓쳤는지, 틀린 선지를 골랐는지
+  var miss = 0, extra = 0;
+  items.forEach(function (it) {
+    if (!isOmr(it)) return;
+    var a = cleanPicks(it.ans, it.opts), p = picksOf(sub, it.no);
+    a.forEach(function (k) { if (p.indexOf(k) < 0) miss++; }); p.forEach(function (k) { if (a.indexOf(k) < 0) extra++; });
+  });
+  if (miss + extra >= 3) {
+    if (miss >= extra * 2) out.push('선지 판단에서는 맞는 설명을 끝까지 골라내지 못하고 놓치는 경우가 많아, 선지마다 본문 근거를 찾아 확인하는 연습이 필요합니다.');
+    else if (extra >= miss * 2) out.push('선지 판단에서는 틀린 설명을 맞는 것으로 판단하는 경우가 많아, 선지의 핵심어를 본문과 하나씩 대조하는 연습이 필요합니다.');
+  }
+
+  // 4. 지난 클리닉에서도 약했던 유형이면 짚어 주고, 아니면 다음 할 일
+  var past = d.subs.filter(function (s) {
+    var ps = d.setById[s.setId]; return s.studentId === sub.studentId && ps && ps.id !== set.id && String(ps.createdAt) < String(set.createdAt);
+  });
+  var pastT = {};
+  past.forEach(function (s) { (d.items[s.setId] || []).forEach(function (it) { (it.types || []).forEach(function (t) { var b = pastT[t] || (pastT[t] = { n: 0, x: 0 }); b.n++; if (s.marks[it.no] === 'X' || s.marks[it.no] === 'G') b.x++; }); }); });
+  var again = weakT.filter(function (t) { var b = pastT[t]; return b && b.n >= 3 && b.x / b.n >= 0.25; });
+  if (again.length) {
+    out.push(TYPES[again[0]] + ' 유형은 지난 클리닉에서도 오답이 있었던 부분이라 다음 클리닉까지 중점적으로 보완하겠습니다.');
+  } else if (rate >= 0.9 && out.length < 4) {
+    out.push('남은 기간에는 사소한 실수를 줄이는 데 집중하겠습니다.');
+  } else if (wrong.length && out.length < 4) {
+    out.push(fbPick(seed, ['틀린 문항은 해설과 함께 다시 확인하도록 지도하겠습니다.', '틀린 문항의 근거를 다시 짚어 보며 복습하도록 지도하겠습니다.']));
+  }
+  return out.slice(0, 4).join(' ');
+}
+
+function fbKey(r) { return r.set.id + '.' + r.st.id; }
+function fbText(r) {
+  var k = fbKey(r);
+  if (A.fbEdit[k] === undefined) { var sv = store_get('fb.' + k); if (sv !== null) A.fbEdit[k] = sv; }
+  if (A.fbEdit[k] !== undefined) return A.fbEdit[k];
+  return r.sub ? feedbackFor(r.set, r.sub, A.data) : '';
+}
+function fbBox(r, i) {
+  if (!A.addFb || !r.sub) return '';
+  var edited = A.fbEdit[fbKey(r)] !== undefined;
+  return '<div class="fbl"><span>개인 피드백' + (edited ? ' <b>· 고친 문장</b>' : ' · 자동') + '</span>' + (edited ? '<button class="mini" data-act="fb-reset" data-i="' + i + '">자동 문장으로</button>' : '') + '</div>' +
+    '<textarea data-fb="' + i + '" rows="5" aria-label="' + h(r.st.name) + ' 개인 피드백">' + h(fbText(r)) + '</textarea>';
+}
 function smsText(r) {
   var exam = A.exam || '기말고사';
   var lines = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']', ''];
@@ -1348,8 +1447,8 @@ function smsText(r) {
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
   if (r.extra && r.set.evalName) { lines.push(''); lines.push('■ ' + r.set.evalName + ' 성취도'); lines.push('- ' + r.extra + ' ( A+ / A / B / C / F)'); }
-  var note = getNote(r.set).trim();
-  if (note) { lines.push(''); lines.push('■ 클리닉 진행 사항'); lines.push('- ' + note); }
+  var note = getNote(r.set).trim(), fb = A.addFb ? fbText(r).trim() : '';
+  if (note || fb) { lines.push(''); lines.push('■ 클리닉 진행 사항'); if (note) lines.push('- ' + note); if (fb) lines.push('- ' + fb); }
   return lines.join('\n');
 }
 function tabToday() {
@@ -1367,7 +1466,7 @@ function tabToday() {
   setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
-    '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label></div>' +
+    '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label><label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>' +
     setsToday.map(function (set) {
       return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
         '<textarea id="note-' + set.id + '" data-note="' + set.id + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(set)) + '</textarea>';
@@ -1387,7 +1486,7 @@ function tabToday() {
         '<td>' + h(r.extra) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
   html += '<div class="smslist">' + rows.map(function (r, i) {
-    return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '" data-school="' + h(r.st.school) + '">' + h(smsText(r)) + '</pre></div>';
+    return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '" data-school="' + h(r.st.school) + '">' + h(smsText(r)) + '</pre>' + fbBox(r, i) + '</div>';
   }).join('') + '</div>';
   return html;
 }
@@ -1555,6 +1654,7 @@ function onClick(ev) {
     var cq = $('#in-ckq'); if (cq && !('ontouchstart' in window)) { cq.focus(); cq.select(); }
     return;
   }
+  if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) { var k8 = fbKey(r8); delete A.fbEdit[k8]; store_set('fb.' + k8, null); } return renderKeep(); }
   if (act === 'copy-sms') { var i = Number(t.dataset.i); copyText(smsText(A.todayRows[i]), $('#sms-' + i)); return; }
   if (act === 'copy-acad') {
     copyText(JSON.stringify({ v: 1, rows: A.todayRows.map(function (r) { return { n: r.st.name, s: r.st.school, m: smsText(r) }; }) }), null);
@@ -1661,6 +1761,7 @@ function onChange(ev) {
   if (t.id === 'sel-ck') { A.ckSet = t.value; return render(); }
   if (t.id === 'sel-exam') { A.exam = t.value; store_set('exam', t.value); refreshSms(); return; }
   if (t.id === 'chk-weak') { A.addWeak = t.checked; refreshSms(); return; }
+  if (t.id === 'chk-fb') { A.addFb = t.checked; store_set('addFb', t.checked ? '1' : '0'); return renderKeep(); }
   if (t.id === 'in-day') { A.day = t.value || todayStr(); return render(); }
   if (t.id === 'sel-set') { A.setId = t.value; A.showAllItems = false; A.showAllQ = false; return render(); }
   if (t.dataset && t.dataset.edit && A.edit) {
@@ -1694,6 +1795,11 @@ function onInput(ev) {
       set2.evalName = ev.target.value.trim(); refreshSms(); queueNoteSave(sid2);
       A.data.students.forEach(function (stx) { if (stx.school === set2.school) refreshCkRow(sid2, stx.id); });
     }
+    return;
+  }
+  if (ev.target.dataset && ev.target.dataset.fb !== undefined) {
+    var i9 = ev.target.dataset.fb, r9 = A.todayRows[Number(i9)];
+    if (r9) { var k9 = fbKey(r9); A.fbEdit[k9] = ev.target.value; store_set('fb.' + k9, ev.target.value); var el9 = $('#sms-' + i9); if (el9) el9.textContent = smsText(r9); }
     return;
   }
   if (ev.target.dataset && ev.target.dataset.note !== undefined) {
