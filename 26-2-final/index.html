@@ -254,7 +254,7 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 <div id="busy" class="busybar" hidden></div>
 <div id="app"></div>
 <script>
-/* ▼ Apps Script 웹 앱 주소. 비워 두면 예시 데이터 미리보기로 열려요. */
+/* ▼ Apps Script 웹 앱 주소. 비워 두면 예시 데이터 미리보기로 열립니다. */
 var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB_-CxSnZND29jsOmX6yDW-QLcFYvlQlh3QnpAGBCkDG11Zqik-_A/exec';
 </script>
 <script>
@@ -306,7 +306,7 @@ function requireStudent(req, store, env) {
 
 function requireAdmin(req, store, env) {
   var ok = req.token && env.cacheGet('a:' + req.token);
-  if (!ok) throw userErr('선생님 로그인이 필요해요. 다시 로그인해 주세요.');
+  if (!ok) throw userErr('선생님 로그인이 필요합니다. 다시 로그인해 주세요.');
   return true;
 }
 
@@ -514,8 +514,8 @@ var CORE_ACTIONS = {
     var omr = setIsOmr(items), marks, follow;
     if (omr) {
       var prev = store.subs().filter(function (s) { return s.setId === set.id && s.studentId === st.id; })[0];
-      if (prev) { var f0 = fail('이미 제출한 클리닉이에요. 고칠 게 있으면 선생님께 말씀 드리세요.'); f0.already = true; return f0; }
-      if (!req.picks || typeof req.picks !== 'object') return fail('화면이 예전 버전이에요. 새로고침한 뒤 다시 제출해 주세요.');
+      if (prev) { var f0 = fail('이미 제출한 클리닉입니다. 고칠 것이 있으면 선생님께 말씀 드리세요.'); f0.already = true; return f0; }
+      if (!req.picks || typeof req.picks !== 'object') return fail('화면이 예전 버전입니다. 새로고침한 뒤 다시 제출해 주세요.');
       var picks = req.picks, essayX = cleanMarks(req.marks, n, ['X']);
       marks = {}; follow = {};
       items.forEach(function (it) {
@@ -551,7 +551,7 @@ var CORE_ACTIONS = {
     var n = lockCheck(env, 'admin');
     if (!env.adminPassword || String(req.pw || '') !== env.adminPassword) {
       lockBump(env, 'admin', n);
-      return fail('비밀번호가 맞지 않아요. (' + (n + 1) + '/5)');
+      return fail('비밀번호가 맞지 않습니다. (' + (n + 1) + '/5)');
     }
     env.cacheRemove('fail:admin');
     var token = env.uuid();
@@ -596,14 +596,14 @@ var CORE_ACTIONS = {
   updateStudent: function (req, store, env) {
     requireAdmin(req, store, env);
     var st = store.students().filter(function (s) { return s.id === req.id; })[0];
-    if (!st) return fail('학생을 찾을 수 없어요.');
+    if (!st) return fail('학생을 찾을 수 없습니다.');
     if (req.op === 'reset') { st.pwHash = pwHash(env, st.id, '0000'); st.mustChange = true; env.cacheRemove('fail:' + st.id); }
     else if (req.op === 'leave') st.status = 'left';
     else if (req.op === 'return') st.status = 'active';
     else if (req.op === 'edit') {
       if (req.name) st.name = String(req.name).trim();
       if (req.school) st.school = String(req.school).trim();
-    } else return fail('알 수 없는 작업이에요.');
+    } else return fail('알 수 없는 작업입니다.');
     store.putStudent(st);
     return { ok: true, student: publicStudent(st) };
   },
@@ -619,7 +619,7 @@ var CORE_ACTIONS = {
       if (opts && !o.essay) { o.opts = opts; o.ans = cleanPicks(it.ans, 20); }
       return o;
     });
-    if (!items.length) return fail('문항이 하나도 없어요.');
+    if (!items.length) return fail('문항이 하나도 없습니다.');
     var omrSet = setIsOmr(items);
     var noAns = items.filter(function (it) {
       if (it.essay) return false;
@@ -629,9 +629,9 @@ var CORE_ACTIONS = {
     if (noAns.length) return fail('선지 수나 정답이 맞지 않는 문항: ' + noAns.join(', ') + '번');
     var old = s.id && store.sets().filter(function (x) { return x.id === s.id; })[0];
     var oldItems = old ? (itemsMap(store)[old.id] || []) : [];
-    if (old && setIsOmr(oldItems) && req.v !== 2) return fail('화면이 예전 버전이에요. 새로고침한 뒤 다시 저장해 주세요.');
+    if (old && setIsOmr(oldItems) && req.v !== 2) return fail('화면이 예전 버전입니다. 새로고침한 뒤 다시 저장해 주세요.');
     if (old && omrSet && oldItems.length !== items.length && store.subs().some(function (sb) { return sb.setId === old.id && hasPicks(sb); }))
-      return fail('이미 무한선지로 제출한 학생이 있어서 문항 수를 바꿀 수 없어요. (지금 ' + oldItems.length + '문항)');
+      return fail('이미 무한선지로 제출한 학생이 있어서 문항 수를 바꿀 수 없습니다. (지금 ' + oldItems.length + '문항)');
     var set = { id: old ? old.id : 'C' + env.uuid().replace(/-/g, '').slice(0, 10), school: String(s.school).trim(),
       week: String(s.week).trim(), title: String(s.title || (s.school + ' ' + s.week)).trim(),
       homework: (Array.isArray(s.homework) ? s.homework : []).map(function (h) { return String(h).trim(); }).filter(Boolean),
@@ -656,7 +656,7 @@ var CORE_ACTIONS = {
   saveChecks: function (req, store, env) {
     requireAdmin(req, store, env);
     var set = store.sets().filter(function (x) { return x.id === req.setId; })[0];
-    if (!set) return fail('세트를 찾을 수 없어요.');
+    if (!set) return fail('세트를 찾을 수 없습니다.');
     var ids = {}; store.students().forEach(function (s) { ids[s.id] = 1; });
     var saved = [];
     (Array.isArray(req.list) ? req.list : []).forEach(function (r) {
@@ -672,7 +672,7 @@ var CORE_ACTIONS = {
   saveNote: function (req, store, env) {
     requireAdmin(req, store, env);
     var set = store.sets().filter(function (x) { return x.id === req.setId; })[0];
-    if (!set) return fail('세트를 찾을 수 없어요.');
+    if (!set) return fail('세트를 찾을 수 없습니다.');
     if (req.note !== undefined) set.note = String(req.note || '').slice(0, 1500);
     if (req.evalName !== undefined) set.evalName = String(req.evalName || '').trim().slice(0, 60);
     store.putSet(set);
@@ -682,7 +682,7 @@ var CORE_ACTIONS = {
   setOpen: function (req, store, env) {
     requireAdmin(req, store, env);
     var set = store.sets().filter(function (x) { return x.id === req.id; })[0];
-    if (!set) return fail('세트를 찾을 수 없어요.');
+    if (!set) return fail('세트를 찾을 수 없습니다.');
     set.open = !!req.open; store.putSet(set);
     return { ok: true, set: set };
   },
@@ -717,9 +717,13 @@ function store_set(k, v) { try { if (v === null) localStorage.removeItem('clinic
 
 var pending = 0;
 function busy(d) { pending += d; var b = document.getElementById('busy'); if (b) b.hidden = pending <= 0; }
+// 서버(Code.gs)가 보내는 안내문도 화면에서는 같은 말투로
+var POLITE = [['필요해', '필요합니다'], ['않았어', '않았습니다'], ['않아', '않습니다'], ['없어', '없습니다'], ['있어', '있습니다'],
+  ['했어', '했습니다'], ['이에', '입니다'], ['예', '입니다'], ['돼', '됩니다'], ['줘', '줍니다']].map(function (p) { return [p[0] + '요', p[1]]; });
+function politeText(m) { m = String(m || ''); POLITE.forEach(function (p) { m = m.split(p[0]).join(p[1]); }); return m; }
 function api(action, payload) {
   busy(1);
-  return apiRaw(action, payload).then(function (r) { busy(-1); return r; });
+  return apiRaw(action, payload).then(function (r) { busy(-1); if (r && r.error) r.error = politeText(r.error); return r; });
 }
 function apiRaw(action, payload) {
   var req = Object.assign({ action: action }, payload || {});
@@ -729,7 +733,7 @@ function apiRaw(action, payload) {
   return fetch(CLINIC_API_URL, { method: 'POST', body: JSON.stringify(req), signal: ctl ? ctl.signal : undefined })
     .then(function (r) { return r.json(); })
     .then(function (x) { clearTimeout(tm); return x; })
-    .catch(function (e) { clearTimeout(tm); return { ok: false, error: e && e.name === 'AbortError' ? '응답이 늦어요. 다시 누르면 제출됐는지 확인해 줘요.' : '서버에 연결되지 않습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.' }; });
+    .catch(function (e) { clearTimeout(tm); return { ok: false, error: e && e.name === 'AbortError' ? '응답이 늦습니다. 다시 눌러 주시면 제출되었는지 확인합니다.' : '서버에 연결되지 않습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.' }; });
 }
 
 function h(s) { return String(s === undefined || s === null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -778,7 +782,7 @@ function barRow(label, b, sub) {
 /* ---------- 공통 틀 ---------- */
 function demoBanner() {
   if (!IS_DEMO) return '';
-  return '<div class="demo">예시 데이터로 보는 미리보기예요. 학생 이름과 기록은 모두 예시입니다. ' +
+  return '<div class="demo">예시 데이터로 보는 미리보기입니다. 학생 이름과 기록은 모두 예시입니다. ' +
     '<button class="link" data-act="demo-student">예시 학생으로 들어가기</button> · <button class="link" data-act="demo-admin">선생님 화면 보기</button></div>';
 }
 function masthead(sub, size) {
@@ -868,9 +872,9 @@ function viewHome() {
       '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
       '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지 공개</small>' : '–')) + '</strong></div>' +
       '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · ' + st.total.n + '문항</small></strong></div></div>' +
-      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 클리닉을 내지 않은 주는 꼴찌로 계산해요.</p>' + trend(entries) + '</section>';
+      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보입니다. 클리닉을 내지 않은 주는 꼴찌로 계산합니다.</p>' + trend(entries) + '</section>';
     var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
-    html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균이에요.</p>' +
+    html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균입니다.</p>' +
       '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return myBar(TYPES[o.key] || o.key, o.b, cls[o.key], areaOfType(o.key)); }).join('') + '</div>' +
       '<div><h3>작품</h3>' + wr.map(function (o) { return myBar(o.key, o.b); }).join('') + '</div></div></section>';
   } else html += '<section class="block"><h2>내 위치</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 등수와 자주 틀리는 곳이 여기에 나타납니다.</p></section>';
@@ -894,7 +898,7 @@ function trend(entries) {
   var W = 320, H = 96, pad = 20;
   var xs = function (i) { return pad + i * (W - pad * 2) / (pts.length - 1); }, ys = function (v) { return H - 20 - v * (H - 38); };
   var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(p.v).toFixed(1); }).join(' ');
-  return '<h3>주차별 우리 학교 안 등수</h3><p class="note">시험마다 난이도가 달라서 점수보다 같은 시험을 본 친구들 사이의 위치로 봐야 정확해요. 위로 갈수록 앞 등수예요.</p>' +
+  return '<h3>주차별 우리 학교 안 등수</h3><p class="note">시험마다 난이도가 달라서 점수보다 같은 시험을 본 친구들 사이의 위치로 봐야 정확합니다. 위로 갈수록 앞 등수입니다.</p>' +
     '<div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="주차별 우리 학교 안 등수">' +
     '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(1) + '" y2="' + ys(1) + '" class="grid"/><line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(0) + '" y2="' + ys(0) + '" class="grid"/>' +
     '<path d="' + path + '" class="line"/>' + pts.map(function (p, i) {
@@ -932,7 +936,7 @@ function viewForm() {
   }
   if (F.omr) {
     html += omrSheet() + (F.err ? '<p class="err">' + h(F.err) + '</p>' : '') +
-      '<p class="note subnote' + (F.sure ? ' armed' : '') + '">' + (F.sure ? h(S.me ? S.me.name + ' 이름으로 ' : '') + '제출할까요? 제출한 뒤에는 고칠 수 없어요.' : '다 골랐으면 제출하세요. 제출한 뒤에는 고칠 수 없어요.') + '</p>' +
+      '<p class="note subnote' + (F.sure ? ' armed' : '') + '">' + (F.sure ? h(S.me ? S.me.name + ' 이름으로 ' : '') + '제출하시겠습니까? 제출한 뒤에는 고칠 수 없습니다.' : '다 골랐으면 제출하세요. 제출한 뒤에는 고칠 수 없습니다.') + '</p>' +
       '<div class="actions"><button class="btn" type="button" data-act="home">돌아가기</button><button class="btn primary' + (F.sure ? ' arm' : '') + '" type="submit">' +
       (F.sure ? '한 번 더 눌러 제출' : '제출하고 채점하기') + '</button></div></form></main>';
     return html;
@@ -967,7 +971,7 @@ function rankUpNote() {
   var pa = a.of > 1 ? (a.rank - 1) / (a.of - 1) : 0, pb = b.of > 1 ? (b.rank - 1) / (b.of - 1) : 0;
   if (pb >= pa) return '';
   var up = a.rank - b.rank;
-  return '<p class="good">지난번보다 ' + (up > 0 ? up + '계단 ' : '') + '올라갔어요!</p>';
+  return '<p class="good">지난번보다 ' + (up > 0 ? up + '계단 ' : '') + '올라갔습니다!</p>';
 }
 var NUMC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
 function numc(k) { return NUMC.charAt(k - 1) || String(k); }
@@ -987,8 +991,8 @@ function omrSheet() {
     var x = F.marks[it.no] === 'X';
     return '<div class="orow">' + head + '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="ess" data-no="' + it.no + '" aria-pressed="' + x + '">' + (x ? '틀림' : '맞음') + '</button></div></div>';
   }).join('');
-  return '<section class="sheet"><h2>복습 테스트</h2><p class="note">세트마다 내가 고른 번호를 <b>모두</b> 누르세요. 다시 누르면 취소돼요. ' +
-    (F.items.some(function (it) { return it.essay; }) ? '서술형은 모범답안과 비교해서 틀렸으면 눌러서 "틀림"으로 바꾸세요. ' : '') + '제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없어요.</p>' +
+  return '<section class="sheet"><h2>복습 테스트</h2><p class="note">세트마다 내가 고른 번호를 <b>모두</b> 누르세요. 다시 누르면 취소됩니다. ' +
+    (F.items.some(function (it) { return it.essay; }) ? '서술형은 모범답안과 비교해서 틀렸으면 눌러서 "틀림"으로 바꾸세요. ' : '') + '제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없습니다.</p>' +
     '<div class="omr">' + rows + '</div><div class="tally"><span>답을 고른 문항</span><strong class="num">' + done + ' / ' + need + '</strong></div></section>';
 }
 function resultBlocks(r) {
@@ -1002,7 +1006,7 @@ function resultBlocks(r) {
       return '<div class="res"><b>' + d.no + '</b><span class="rw">' + h(d.work) + '</span><span class="ra">정답 ' + d.ans.map(function (k) { return '<span class="' + (miss.indexOf(k) >= 0 ? 'miss' : '') + '">' + numc(k) + '</span>'; }).join(' ') +
         ' · 내 답 ' + (d.picks.length ? d.picks.map(function (k) { return '<span class="' + (extra.indexOf(k) >= 0 ? 'extra' : '') + '">' + numc(k) + '</span>'; }).join(' ') : '없음') + '</span>' +
         '<span class="ra rw">' + (miss.length ? '놓친 정답 ' + miss.map(numc).join(' ') : '') + (miss.length && extra.length ? ' · ' : '') + (extra.length ? '잘못 고른 번호 ' + extra.map(numc).join(' ') : '') + '</span></div>';
-    }).join('') : '<p class="note">모두 맞혔어요!</p>') + '</section>';
+    }).join('') : '<p class="note">모두 맞혔습니다!</p>') + '</section>';
   }
   if (st && st.count) {
     var mine = {}; (r.detail || []).forEach(function (d) { if (d.wrong) mine[d.no] = 1; });
@@ -1010,13 +1014,13 @@ function resultBlocks(r) {
     var top = st.items.filter(function (o) { return o.miss > 0; }).sort(function (a, b) { return b.rate - a.rate || a.no - b.no; }).slice(0, 5);
     html += '<section class="sheet"><h2>우리 학교 이번 주 <small>' + st.count + '명 제출</small></h2>' +
       (st.rank && rankShown({ rank: st.rank, of: st.of || st.count }) ? '<div class="kpis"><div><span>이번 주 등수</span><strong class="num">' + st.rank + '<small>등 / ' + (st.of || st.count) + '명</small></strong></div></div>'
-        : st.rank ? '<p class="note">이번 주 등수는 ' + rankCut(st.of || st.count) + '등까지 공개돼요. 다음 주에 도전해 보세요!</p>' : '') +
-      (function () { var got = top.filter(function (o) { return !mine[o.no]; }).length; return top.length && got ? '<p class="good">오답률이 높은 문항 ' + top.length + '개 중 ' + got + '개를 맞혔어요!</p>' : ''; })() +
+        : st.rank ? '<p class="note">이번 주 등수는 ' + rankCut(st.of || st.count) + '등까지 공개됩니다. 다음 주에 도전해 보세요!</p>' : '') +
+      (function () { var got = top.filter(function (o) { return !mine[o.no]; }).length; return top.length && got ? '<p class="good">오답률이 높은 문항 ' + top.length + '개 중 ' + got + '개를 맞혔습니다!</p>' : ''; })() +
       '<h3>오답률이 높은 문항</h3>' + (top.length ? top.map(function (o) {
         return '<div class="res"><b>' + o.no + '</b><span>' + h(o.work) + (mine[o.no] ? '<span class="mytag">나도 틀림</span>' : '') + '</span>' +
           '<span class="ra">오답률 ' + pct(o.rate) + (o.topOpts && o.topOpts.length ? ' · 많이 헷갈린 선지 ' + o.topOpts.map(function (t) { return numc(t[0]); }).join(' ') : '') + '</span></div>';
-      }).join('') : '<p class="note">아직 틀린 학생이 없어요.</p>') +
-      '<p class="note">친구들이 더 제출하면 등수와 오답률이 바뀌어요. 다시 열면 새로 계산돼요.</p></section>';
+      }).join('') : '<p class="note">아직 틀린 학생이 없습니다.</p>') +
+      '<p class="note">친구들이 더 제출하면 등수와 오답률이 바뀝니다. 다시 열면 새로 계산됩니다.</p></section>';
   }
   return html;
 }
@@ -1088,7 +1092,7 @@ function setOptions(sel) {
 
 function tabWeek() {
   var d = A.data, set = d.setById[A.setId];
-  if (!set) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  if (!set) return '<p class="empty">클리닉 세트가 아직 없습니다. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
   var items = d.items[set.id] || [], subs = subsFor(set.id), exp = expectedFor(set);
   var subBy = {}; subs.forEach(function (s) { subBy[s.studentId] = s; });
   var missing = exp.filter(function (s) { return !subBy[s.id]; });
@@ -1139,7 +1143,7 @@ function tabWeek() {
 
   // 이번 세트 작품별
   var setCalc = calc(subs.map(function (sb) { return { items: items, marks: sb.marks }; }));
-  html += '<div class="two"><section class="block"><h2>이번 세트 작품별 오답률</h2>' + (subs.length ? sortedRates(setCalc.work).map(function (o) { return barRow(o.key, o.b); }).join('') : '<p class="empty">아직 제출한 학생이 없어요.</p>') + '</section>';
+  html += '<div class="two"><section class="block"><h2>이번 세트 작품별 오답률</h2>' + (subs.length ? sortedRates(setCalc.work).map(function (o) { return barRow(o.key, o.b); }).join('') : '<p class="empty">아직 제출한 학생이 없습니다.</p>') + '</section>';
 
   // 숙제
   var cks = (d.checks || []).filter(function (c) { return c.setId === set.id; });
@@ -1148,7 +1152,7 @@ function tabWeek() {
     cks.forEach(function (k) { var v = k.grades[hw]; if (c[v] !== undefined) c[v]++; if (v === 'F') fs.push((d.stuById[k.studentId] || {}).name); });
     return '<div class="hwstat"><strong>' + h(hw) + '</strong><span>A ' + c.A + '</span><span>B ' + c.B + '</span><span class="' + (c.F ? 'badtxt' : '') + '">F ' + c.F + '</span>' +
       (fs.length ? '<small>F: ' + fs.map(h).join(', ') + '</small>' : '') + '</div>';
-  }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
+  }).join('') : '<p class="empty">숙제 항목이 없습니다.</p>') + '</section></div>';
 
   // 학생별
   html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th>' + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + '<th>성취도</th><th>제출</th></tr></thead><tbody>' +
@@ -1191,8 +1195,8 @@ function tabStats() {
   }
   var workKeys = sortedRates(all.work).map(function (o) { return o.key; });
   var typeKeys = Object.keys(TYPES).filter(function (t) { return all.type[t]; });
-  html += '<section class="block"><h2>작품별 오답률 <small>높은 순</small></h2>' + (workKeys.length ? table('work', workKeys, function (k) { return k; }) : '<p class="empty">아직 제출된 기록이 없어요.</p>') + '</section>';
-  html += '<section class="block"><h2>유형별 오답률</h2>' + (typeKeys.length ? table('type', typeKeys, function (k) { return TYPES[k]; }, areaOfType) : '<p class="empty">아직 제출된 기록이 없어요.</p>') + '</section>';
+  html += '<section class="block"><h2>작품별 오답률 <small>높은 순</small></h2>' + (workKeys.length ? table('work', workKeys, function (k) { return k; }) : '<p class="empty">아직 제출된 기록이 없습니다.</p>') + '</section>';
+  html += '<section class="block"><h2>유형별 오답률</h2>' + (typeKeys.length ? table('type', typeKeys, function (k) { return TYPES[k]; }, areaOfType) : '<p class="empty">아직 제출된 기록이 없습니다.</p>') + '</section>';
   return html;
 }
 
@@ -1207,7 +1211,7 @@ function tabStudents() {
   var d = A.data;
   var list = d.students.filter(function (s) { return (A.school === '전체' || s.school === A.school); })
     .sort(function (a, b) { return (a.status === b.status ? 0 : a.status === 'active' ? -1 : 1) || a.school.localeCompare(b.school) || a.name.localeCompare(b.name); });
-  var html = '<section class="block sheet"><h2>학생 추가</h2><p class="note">한 줄에 한 명씩, 이름과 학교를 같이 넣어 주세요. 순서는 상관없고 "동양고"는 "동양"으로 줄여서 저장해요. "김도현(동양)"처럼 괄호를 붙여도 괄호는 빼고 저장되고, 동명이인 구분은 사이트가 알아서 해요. 비밀번호는 0000으로 시작하고, 첫 로그인 때 학생이 바꿔요.</p>' +
+  var html = '<section class="block sheet"><h2>학생 추가</h2><p class="note">한 줄에 한 명씩, 이름과 학교를 같이 넣어 주세요. 순서는 상관없고 "동양고"는 "동양"으로 줄여서 저장합니다. "김도현(동양)"처럼 괄호를 붙여도 괄호는 빼고 저장되고, 동명이인 구분은 사이트가 알아서 합니다. 비밀번호는 0000으로 시작하고, 첫 로그인 때 학생이 바꿉니다.</p>' +
     '<textarea id="in-add" rows="4" placeholder="김민준&#9;동양고&#10;김지원&#9;경복여고"></textarea><div class="actions"><button class="btn primary" data-act="add-students">추가</button></div>' +
     (A.addMsg ? '<p class="note">' + h(A.addMsg) + '</p>' : '') + '</section>';
   html += '<div class="toolbar"><div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
@@ -1241,7 +1245,7 @@ function studentModal(id) {
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
     '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>성취도</th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
     (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
-      '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
+      '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없습니다.</p>') +
     '</div></div>';
 }
 
@@ -1288,18 +1292,18 @@ function tabCheck() {
     .sort(function (a, b) { return a.st.name.localeCompare(b.st.name); });
   var html = '<div class="toolbar ck-bar"><input id="in-ckq" class="ck-search" placeholder="이름 또는 초성 (예: ㄱㅈㅇ)" value="' + h(A.ckQ) + '" autocomplete="off">' +
     '<select id="sel-ck" aria-label="세트"><option value="ALL"' + (A.ckSet === 'ALL' ? ' selected' : '') + '>받는 중인 세트 전체</option>' + setOptions(A.ckSet) + '</select></div>' +
-    '<p class="note">이름 첫 글자나 초성만 쳐도 찾아져요. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워져요. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있어요.</p>';
-  if (!d.sets.length) return html + '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
-  if (!rows.length) return html + '<p class="empty">받는 중인 세트가 있는 학생이 없어요.</p>';
+    '<p class="note">이름 첫 글자나 초성만 쳐도 찾아집니다. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워집니다. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있습니다.</p>';
+  if (!d.sets.length) return html + '<p class="empty">클리닉 세트가 아직 없습니다. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  if (!rows.length) return html + '<p class="empty">받는 중인 세트가 있는 학생이 없습니다.</p>';
   var shownSets = []; rows.forEach(function (r) { if (shownSets.indexOf(r.set) < 0) shownSets.push(r.set); });
   shownSets.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<details class="evalbox"' + (shownSets.some(function (x) { return x.evalName; }) ? ' open' : '') + '><summary>이번 주 추가 평가 (현대어 해석 시험 등) <small class="muted">' +
     (shownSets.filter(function (x) { return x.evalName; }).map(function (x) { return x.school + ': ' + x.evalName; }).join(' · ') || '없음') + '</small></summary>' +
-    '<p class="note">추가 평가가 있는 학교만 이름을 쓰면, 그 학교 학생들에게만 A+ / A / B / C / F 버튼이 생겨요. 비우면 버튼이 사라져요.</p><div class="evalgrid">' +
+    '<p class="note">추가 평가가 있는 학교만 이름을 쓰면, 그 학교 학생들에게만 A+ / A / B / C / F 버튼이 생깁니다. 비우면 버튼이 사라집니다.</p><div class="evalgrid">' +
     shownSets.map(function (x) {
       return '<label for="evn-' + x.id + '">' + h(fullSchool(x.school) + ' ' + x.week) + '</label><input id="evn-' + x.id + '" data-evname="' + x.id + '" value="' + h(x.evalName || '') + '" placeholder="없으면 비워 두기">';
     }).join('') + '</div></details>';
-  html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
+  html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없습니다.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
   return html;
 }
 function extraOf(setId, sid) {
@@ -1316,7 +1320,7 @@ function ckRowHtml(st, set) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
         }).join('') + '</div></div>';
-      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없어요.</span>') +
+      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<span class="muted">이 세트에는 숙제 항목이 없습니다.</span>') +
       (!set.evalName ? '' : '<div class="ck-item ck-ach"><span>' + h(set.evalName) + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
         var on = extraOf(set.id, st.id) === v;
         return '<button type="button" class="' + (on ? 'on g' + (v === 'A+' || v === 'A' ? 'A' : v === 'F' ? 'F' : 'B') : '') + '" data-act="ach" data-set="' + set.id + '" data-st="' + st.id + '" data-v="' + v + '">' + v + '</button>';
@@ -1520,24 +1524,24 @@ function tabToday() {
     '<div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
       return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>';
-  html += '<p class="note">이 날짜에 숙제 검사를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
-  if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
+  html += '<p class="note">이 날짜에 숙제 검사를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 됩니다.</p>';
+  if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없습니다.</p>';
   var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
   setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
     '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label><label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>' +
-    (A.addFb ? '<p class="note">학생별 피드백을 넣는 동안에는 \'클리닉 진행 사항\'에 학생마다 다른 피드백 한 줄만 들어가요. 문자 카드 아래 칸에서 고칠 수 있어요.</p>' : '') +
+    (A.addFb ? '<p class="note">학생별 피드백을 넣는 동안에는 \'클리닉 진행 사항\'에 학생마다 다른 피드백 한 줄만 들어갑니다. 문자 카드 아래 칸에서 고칠 수 있습니다.</p>' : '') +
     (A.addFb ? [] : setsToday).map(function (set) {
-      return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
+      return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어갑니다. 다른 날 와도 그대로입니다) </small><small id="note-st-' + set.id + '"></small></label>' +
         '<textarea id="note-' + set.id + '" data-note="' + set.id + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(set)) + '</textarea>';
     }).join('') + '</section>';
   html += '<section class="sheet stack"><h2>학원관리시스템에 한 번에 넣기</h2>' +
-    '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러요.</li><li>학원관리시스템 클리닉수업관리 화면에서 북마크 바의 <b>클리닉 결과 넣기</b>를 눌러요.</li>' +
-    '<li>뜨는 칸에 Ctrl + V로 붙여 넣고 확인 → 평가 칸이 채워지면 내용을 확인하고 <b>저장</b>을 눌러요.</li></ol>' +
+    '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러 주세요.</li><li>학원관리시스템 클리닉수업관리 화면에서 북마크 바의 <b>클리닉 결과 넣기</b>를 눌러 주세요.</li>' +
+    '<li>뜨는 칸에 Ctrl + V로 붙여 넣고 확인 → 평가 칸이 채워지면 내용을 확인하고 <b>저장</b>을 눌러 주세요.</li></ol>' +
     '<div class="actions"><button class="btn" data-act="copy-all">문자 문구만 전체 복사</button><button class="btn primary" data-act="copy-acad">학원관리시스템용 복사</button></div>' +
     '<details><summary>처음 한 번만: "클리닉 결과 넣기" 북마크 만들기</summary>' +
-    '<p class="note">웨일·크롬 모두 Ctrl + Shift + B를 누르면 북마크 바가 켜져요. 아래 빨간 버튼을 마우스로 끌어서 북마크 바에 놓으면 끝이에요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "클리닉 결과 넣기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
+    '<p class="note">웨일·크롬 모두 Ctrl + Shift + B를 누르면 북마크 바가 켜집니다. 아래 빨간 버튼을 마우스로 끌어서 북마크 바에 놓으면 끝입니다. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "클리닉 결과 넣기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn primary bm" href="' + h(BOOKMARKLET_HREF) + '" onclick="return false">클리닉 결과 넣기</a><button class="btn" data-act="copy-bm">코드 복사</button></div></details></section>';
   html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th>약한 유형</th></tr></thead><tbody>' +
     rows.map(function (r) {
@@ -1554,9 +1558,9 @@ function tabToday() {
 function copyText(text, el) {
   function fallback() {
     if (el) { var rg = document.createRange(); rg.selectNodeContents(el); var sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(rg); }
-    toast('자동 복사가 막혀 있어요. 선택된 글자를 Ctrl+C로 복사해 주세요.', true);
+    toast('자동 복사가 막혀 있습니다. 선택된 글자를 Ctrl+C로 복사해 주세요.', true);
   }
-  try { navigator.clipboard.writeText(text).then(function () { toast('복사했어요.'); }, fallback); } catch (e) { fallback(); }
+  try { navigator.clipboard.writeText(text).then(function () { toast('복사했습니다.'); }, fallback); } catch (e) { fallback(); }
 }
 
 /* 세트 */
@@ -1574,14 +1578,14 @@ function tabSets() {
   var d = A.data;
   if (A.edit) return setEditor();
   var html = '<div class="toolbar"><button class="btn primary" data-act="new-set">새 클리닉 세트</button></div>';
-  if (!d.sets.length) return html + '<p class="empty">아직 세트가 없어요. Claude가 태깅해 준 내용을 붙여 넣어서 만들면 돼요.</p>';
+  if (!d.sets.length) return html + '<p class="empty">아직 세트가 없습니다. Claude가 태깅해 준 내용을 붙여 넣어서 만들면 됩니다.</p>';
   html += '<div class="tscroll"><table class="t"><thead><tr><th>학교</th><th>주차</th><th>제목</th><th class="r">문항</th><th class="r">제출</th><th>상태</th><th></th></tr></thead><tbody>' +
     d.sets.map(function (s) {
       var cf = A.confirm && A.confirm.id === s.id && A.confirm.op === 'del';
       return '<tr><td>' + h(s.school) + '</td><td>' + h(s.week) + '</td><td>' + h(s.title) + '</td><td class="r num">' + (d.items[s.id] || []).length + '</td><td class="r num">' + subsFor(s.id).length + '/' + expectedFor(s).length + '</td>' +
         '<td><button class="chip ' + (s.open ? 'ok' : '') + '" data-act="toggle-open" data-id="' + s.id + '">' + (s.open ? '받는 중' : '마감') + '</button></td>' +
         '<td class="acts"><button class="mini" data-act="edit-set" data-id="' + s.id + '">편집</button><button class="mini' + (cf ? ' arm' : '') + '" data-act="del-set" data-id="' + s.id + '">' + (cf ? '한 번 더 누르면 삭제(제출 기록 포함)' : '삭제') + '</button></td></tr>';
-    }).join('') + '</tbody></table></div><p class="note">학생 화면에는 "받는 중"인 세트만 이번 주로 떠요. 지난주 세트는 마감해 두면 지난 클리닉으로 내려가요.</p>';
+    }).join('') + '</tbody></table></div><p class="note">학생 화면에는 "받는 중"인 세트만 이번 주로 뜹니다. 지난주 세트는 마감해 두면 지난 클리닉으로 내려갑니다.</p>';
   return html;
 }
 function setEditor() {
@@ -1592,7 +1596,7 @@ function setEditor() {
     '<label class="span2">제목<input id="e-title" value="' + h(e.title) + '" placeholder="비우면 학교+주차"></label><label class="span2">숙제 항목 (쉼표로 구분)<input id="e-hw" value="' + h(e.homework) + '"></label></div>' +
     '<datalist id="dl-school">' + d.schools.map(function (s) { return '<option value="' + h(s) + '">'; }).join('') + '</datalist>' +
     '<datalist id="dl-work">' + works.map(function (w) { return '<option value="' + h(w) + '">'; }).join('') + '</datalist>' +
-    '<details' + (e.items.length ? '' : ' open') + '><summary>Claude가 만든 태그 붙여 넣기</summary><p class="note">Claude한테 클리닉 파일 주면 이 칸에 넣을 내용을 만들어 줘요. 붙여 넣고 "불러오기"를 누르면 아래 표가 채워져요.</p>' +
+    '<details' + (e.items.length ? '' : ' open') + '><summary>Claude가 만든 태그 붙여 넣기</summary><p class="note">Claude한테 클리닉 파일 주면 이 칸에 넣을 내용을 만들어 줍니다. 붙여 넣고 "불러오기"를 누르면 아래 표가 채워집니다.</p>' +
     '<textarea id="e-paste" rows="5">' + h(e.paste) + '</textarea><div class="actions"><button class="btn" data-act="import-tags">불러오기</button></div></details>' +
     '<div class="block-h"><h3>문항 ' + e.items.length + '개</h3><div class="inline"><label for="e-count">문항 수</label><input id="e-count" type="number" min="1" max="200" value="' + (e.items.length || '') + '" class="short"><button class="mini" data-act="set-count">맞추기</button></div></div>' +
     '<div class="tscroll"><table class="t edit-t"><thead><tr><th>번호</th><th>작품</th><th>영역</th><th>유형 1</th><th>유형 2</th><th>서술형</th><th>선지 수</th><th>정답</th></tr></thead><tbody>' +
@@ -1615,10 +1619,10 @@ function readEditHeader() {
 }
 function parseTags(text) {
   text = String(text || '').trim();
-  if (!text) throw new Error('붙여 넣은 내용이 비어 있어요.');
+  if (!text) throw new Error('붙여 넣은 내용이 비어 있습니다.');
   var obj = JSON.parse(text);
   var items = Array.isArray(obj) ? obj : obj.items;
-  if (!Array.isArray(items)) throw new Error('items 목록을 찾지 못했어요.');
+  if (!Array.isArray(items)) throw new Error('items 목록을 찾지 못했습니다.');
   return { meta: Array.isArray(obj) ? {} : obj, items: items.map(function (it) {
     var types = (it.types || []).filter(function (t) { return TYPES[t]; }).slice(0, 2);
     var opts = Math.max(0, Math.min(20, Math.floor(Number(it.opts) || 0)));
@@ -1680,7 +1684,7 @@ function onClick(ev) {
   if (act === 'back-login') { L.err = ''; setView('login'); return; }
   if (act === 'pick') { L.pick = { id: id, label: t.dataset.label }; L.err = ''; setView('pw'); return; }
   if (act === 'logout') { logout(); return; }
-  if (act === 'home') { if (S.view === 'form' && F && F.sending) { toast('제출하는 중이에요. 잠깐만 기다려 주세요.'); return; } loadHome(); return; }
+  if (act === 'home') { if (S.view === 'form' && F && F.sending) { toast('제출하는 중입니다. 잠시만 기다려 주세요.'); return; } loadHome(); return; }
   if (act === 'open-set') { openSet(id); return; }
   if (F && S.view === 'form') {
     keepMsg();
@@ -1696,7 +1700,7 @@ function onClick(ev) {
   }
   // 선생님
   if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
-  if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔어요.'); }); return; }
+  if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔습니다.'); }); return; }
   if (act === 'school') { A.school = t.dataset.v; return render(); }
   if (act === 'ach') {
     var k2 = t.dataset.set + ':' + t.dataset.st;
@@ -1734,7 +1738,7 @@ function onClick(ev) {
     A.confirm = null;
     api('updateStudent', { token: S.token, id: id, op: op }).then(function (r) {
       if (!r.ok) return toast(r.error, true);
-      toast(op === 'reset' ? '비밀번호를 0000으로 돌렸어요.' : op === 'leave' ? '퇴원 처리했어요. 기록은 남아 있어요.' : '복귀 처리했어요.');
+      toast(op === 'reset' ? '비밀번호를 0000으로 돌렸습니다.' : op === 'leave' ? '퇴원 처리했습니다. 기록은 남아 있습니다.' : '복귀 처리했습니다.');
       applyAdmin(r.all);
     });
     return;
@@ -1763,7 +1767,7 @@ function onClick(ev) {
   if (act === 'del-set') {
     if (!(A.confirm && A.confirm.id === id && A.confirm.op === 'del')) { A.confirm = { id: id, op: 'del' }; return render(); }
     A.confirm = null;
-    api('deleteSet', { token: S.token, id: id }).then(function (r) { if (!r.ok) return toast(r.error, true); toast('삭제했어요.'); applyAdmin(r.all); });
+    api('deleteSet', { token: S.token, id: id }).then(function (r) { if (!r.ok) return toast(r.error, true); toast('삭제했습니다.'); applyAdmin(r.all); });
     return;
   }
   if (act === 'import-tags') {
@@ -1779,9 +1783,9 @@ function onClick(ev) {
       if (p.meta.week) A.edit.week = A.edit.week || p.meta.week;
       if (p.meta.title) A.edit.title = A.edit.title || p.meta.title;
       if (p.meta.homework) A.edit.homework = p.meta.homework.join(', ');
-      A.edit.err = (A.edit.school && !A.data.students.some(function (x) { return x.school === A.edit.school; })) ? '학생 명단에 \'' + A.edit.school + '\' 학교가 없어요. 학교 이름이 명단과 똑같아야 학생 화면에 떠요.' : '';
-      toast(p.items.length + '문항 불러왔어요. 학교(' + A.edit.school + ')를 확인하고 저장하세요.');
-    } catch (e) { A.edit.err = '불러오지 못했어요. Claude가 준 내용을 처음부터 끝까지 그대로 붙여 넣었는지 확인해 주세요. (' + e.message + ')'; }
+      A.edit.err = (A.edit.school && !A.data.students.some(function (x) { return x.school === A.edit.school; })) ? '학생 명단에 \'' + A.edit.school + '\' 학교가 없습니다. 학교 이름이 명단과 똑같아야 학생 화면에 뜹니다.' : '';
+      toast(p.items.length + '문항 불러왔습니다. 학교(' + A.edit.school + ')를 확인하고 저장하세요.');
+    } catch (e) { A.edit.err = '불러오지 못했습니다. Claude가 준 내용을 처음부터 끝까지 그대로 붙여 넣었는지 확인해 주세요. (' + e.message + ')'; }
     return render();
   }
   if (act === 'set-count') {
@@ -1803,14 +1807,14 @@ function onClick(ev) {
       if (!o) return omrSet ? i + 1 : 0;
       return (!a.length || a.some(function (k) { return k > o; })) ? i + 1 : 0;
     }).filter(Boolean);
-    if (badAns.length) { e.err = '선지 수와 정답을 확인해 주세요: ' + badAns.join(', ') + '번 (정답이 비었거나, 선지 수보다 큰 번호가 있거나, 선지 수가 비어 있어요)'; return render(); }
+    if (badAns.length) { e.err = '선지 수와 정답을 확인해 주세요: ' + badAns.join(', ') + '번 (정답이 비었거나, 선지 수보다 큰 번호가 있거나, 선지 수가 비어 있습니다)'; return render(); }
     api('saveSet', { v: 2, token: S.token, set: { id: e.id, school: e.school, week: e.week, title: e.title, open: e.open,
       homework: e.homework.split(',').map(function (x) { return x.trim(); }).filter(Boolean) }, items: e.items }).then(function (r) {
       if (!r.ok) { e.err = r.error; return render(); }
       var lost = setIsOmr(e.items) && r.all && r.all.items && !setIsOmr(r.all.items[r.set.id]);
-      toast(r.regraded ? '저장했어요. 이미 제출한 ' + r.regraded + '명 점수를 새 정답으로 다시 매겼어요.' : '저장했어요.'); A.edit = null; A.setId = r.set.id; applyAdmin(r.all);
-      if (r.oldSubs && !lost) alert('이 세트를 예전 방식(틀림/찍맞)으로 이미 낸 학생이 ' + r.oldSubs + '명 있어요. 그 학생들은 무한선지로 다시 낼 수 없어요.\n다시 받으려면 구글 시트 subs 탭에서 그 학생 줄을 지워 주세요.');
-      if (lost) alert('저장은 됐지만 서버가 아직 예전 버전이라 선지 수와 정답이 빠졌어요.\nApps Script에 무한선지 파일(omr.gs)을 추가하고 새 버전으로 배포한 뒤, 이 세트를 열어 태그를 다시 붙여 넣고 저장해 주세요.');
+      toast(r.regraded ? '저장했습니다. 이미 제출한 ' + r.regraded + '명 점수를 새 정답으로 다시 매겼습니다.' : '저장했습니다.'); A.edit = null; A.setId = r.set.id; applyAdmin(r.all);
+      if (r.oldSubs && !lost) alert('이 세트를 예전 방식(틀림/찍맞)으로 이미 낸 학생이 ' + r.oldSubs + '명 있습니다. 그 학생들은 무한선지로 다시 낼 수 없습니다.\n다시 받으려면 구글 시트 subs 탭에서 그 학생 줄을 지워 주세요.');
+      if (lost) alert('저장은 되었지만 서버가 아직 예전 버전이라 선지 수와 정답이 빠졌습니다.\nApps Script에 무한선지 파일(omr.gs)을 추가하고 새 버전으로 배포한 뒤, 이 세트를 열어 태그를 다시 붙여 넣고 저장해 주세요.');
     });
     return;
   }
@@ -1913,7 +1917,7 @@ function onSubmit(ev) {
     F.err = '';
     if (F.omr) {
       var empty = F.items.filter(function (it) { return isOmr(it) && !(F.picks[it.no] || []).length; }).map(function (it) { return it.no; });
-      if (empty.length) { F.err = empty.join(', ') + '번에서 아무것도 고르지 않았어요. 빨간 번호를 확인해 주세요.'; F.sure = false; return renderKeep(); }
+      if (empty.length) { F.err = empty.join(', ') + '번에서 아무것도 고르지 않았습니다. 빨간 번호를 확인해 주세요.'; F.sure = false; return renderKeep(); }
       if (!F.sure) { F.sure = true; F.armedAt = Date.now(); return renderKeep(); }
       if (Date.now() - F.armedAt < 600) return renderKeep(); // 같은 자리 연타는 무시(폼 잠금도 풀어 줌)
       if (F.sending) return;
