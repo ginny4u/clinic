@@ -848,21 +848,25 @@ function viewHome() {
   return html + '</main>';
 }
 function trend(entries) {
+  // 주마다 시험 난이도가 달라서 점수 대신 같은 시험을 본 같은 학교 친구들 사이의 위치를 그림
   var setMeta = {}; HOME.sets.forEach(function (s) { setMeta[s.id] = s; });
+  var rs = (HOME.ranks && HOME.ranks.sets) || {};
   var pts = entries.map(function (e) {
-    var n = e.items.length, x = Object.keys(e.marks).filter(function (k) { return e.marks[k] === 'X'; }).length;
-    return { t: (setMeta[e.setId] || {}).createdAt || '', w: (setMeta[e.setId] || {}).week || '', v: n ? (n - x) / n : 0 };
-  }).sort(function (a, b) { return a.t.localeCompare(b.t); });
+    var r = rs[e.setId]; if (!r || !r.of) return null;
+    return { t: (setMeta[e.setId] || {}).createdAt || '', w: (setMeta[e.setId] || {}).week || '', r: r,
+      v: r.of > 1 ? 1 - (r.rank - 1) / (r.of - 1) : 1 };
+  }).filter(Boolean).sort(function (a, b) { return a.t.localeCompare(b.t); });
   if (pts.length < 2) return '';
-  var W = 320, H = 90, pad = 18;
-  var xs = function (i) { return pad + i * (W - pad * 2) / (pts.length - 1); }, ys = function (v) { return H - 20 - v * (H - 34); };
+  var W = 320, H = 96, pad = 20;
+  var xs = function (i) { return pad + i * (W - pad * 2) / (pts.length - 1); }, ys = function (v) { return H - 20 - v * (H - 38); };
   var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(p.v).toFixed(1); }).join(' ');
-  return '<h3>주차별 맞힌 비율</h3><div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="주차별 맞힌 비율">' +
-    '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(1) + '" y2="' + ys(1) + '" class="grid"/><line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(0.5) + '" y2="' + ys(0.5) + '" class="grid"/>' +
+  return '<h3>주차별 우리 학교 안 등수</h3><p class="note">시험마다 난이도가 달라서 점수보다 같은 시험을 본 친구들 사이의 위치로 봐야 정확해요. 위로 갈수록 앞 등수예요.</p>' +
+    '<div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="주차별 우리 학교 안 등수">' +
+    '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(1) + '" y2="' + ys(1) + '" class="grid"/><line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(0) + '" y2="' + ys(0) + '" class="grid"/>' +
     '<path d="' + path + '" class="line"/>' + pts.map(function (p, i) {
       return '<circle cx="' + xs(i) + '" cy="' + ys(p.v) + '" r="' + (i === pts.length - 1 ? 4 : 2.5) + '" class="dot"/>' +
         '<text x="' + xs(i) + '" y="' + (H - 4) + '" text-anchor="middle" class="lbl">' + h(p.w) + '</text>' +
-        '<text x="' + xs(i) + '" y="' + (ys(p.v) - 7) + '" text-anchor="middle" class="val">' + pct(p.v) + '</text>';
+        '<text x="' + xs(i) + '" y="' + (ys(p.v) - 7) + '" text-anchor="middle" class="val">' + p.r.rank + '/' + p.r.of + '등</text>';
     }).join('') + '</svg></div>';
 }
 
@@ -1058,17 +1062,25 @@ function tabWeek() {
   var anyOmr = setIsOmr(items);
   per.forEach(function (p) {
     if (!isOmr(p.it)) return;
-    var ans = cleanPicks(p.it.ans, p.it.opts), cnt = {};
-    subs.forEach(function (s) { var pk = picksOf(s, p.it.no); for (var k = 1; k <= p.it.opts; k++) if ((ans.indexOf(k) >= 0) !== (pk.indexOf(k) >= 0)) cnt[k] = (cnt[k] || 0) + 1; });
-    p.opts = Object.keys(cnt).map(function (k) { return [Number(k), cnt[k]]; }).sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; }).slice(0, 3);
+    var ans = cleanPicks(p.it.ans, p.it.opts), wp = {}, ms = {};
+    subs.forEach(function (s) {
+      var pk = picksOf(s, p.it.no);
+      for (var k = 1; k <= p.it.opts; k++) {
+        var a = ans.indexOf(k) >= 0, c = pk.indexOf(k) >= 0;
+        if (c && !a) wp[k] = (wp[k] || 0) + 1;   // 오선택: 틀린 선지를 골랐음
+        if (a && !c) ms[k] = (ms[k] || 0) + 1;   // 누락: 옳은 선지를 놓쳤음
+      }
+    });
+    var top3 = function (m) { return Object.keys(m).map(function (k) { return [Number(k), m[k]]; }).sort(function (a, b) { return b[1] - a[1] || a[0] - b[0]; }).slice(0, 3); };
+    p.wp = top3(wp); p.ms = top3(ms);
   });
   var sorted = per.slice().sort(function (a, b) { return b.r - a.r || a.it.no - b.it.no; });
   var shown = A.showAllItems ? per : sorted.slice(0, 15);
   html += '<section class="block"><div class="block-h"><h2>문항별 오답률</h2><button class="link" data-act="toggle-items">' + (A.showAllItems ? '많이 틀린 15개만' : '전체 번호순으로') + '</button></div>' +
-    '<div class="tscroll"><table class="t"><thead><tr><th>번호</th><th>작품</th><th>유형</th><th class="r">틀림</th>' + (anyOmr ? '<th>많이 헷갈린 선지</th>' : '<th class="r">찍맞</th>') + '<th>오답률</th></tr></thead><tbody>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>번호</th><th>작품</th><th>유형</th><th class="r">틀림</th>' + (anyOmr ? '<th title="틀린 선지인데 옳다고 고른 학생 수">잘못 고른 선지</th><th title="옳은 선지인데 고르지 않은 학생 수">놓친 정답</th>' : '<th class="r">찍맞</th>') + '<th>오답률</th></tr></thead><tbody>' +
     shown.map(function (p) {
       return '<tr><td class="num">' + p.it.no + (p.it.essay ? ' <span class="tag">서술</span>' : '') + '</td><td>' + h(p.it.work) + '</td><td class="muted">' + p.it.types.map(function (t) { return h(TYPES[t] || t); }).join(', ') + '</td>' +
-        '<td class="r num">' + p.x + '</td>' + (anyOmr ? '<td class="muted">' + (p.opts ? p.opts.map(function (o) { return numc(o[0]) + ' ' + o[1] + '명'; }).join(' · ') : (p.it.essay ? '서술형' : '')) + '</td>' : '<td class="r num">' + p.g + '</td>') + '<td class="cellbar"><i style="width:' + Math.max(2, p.r * 100) + '%"></i><span>' + pct(p.r) + '</span></td></tr>';
+        '<td class="r num">' + p.x + '</td>' + (anyOmr ? (p.wp ? ['wp', 'ms'].map(function (key) { return '<td class="muted">' + (p[key].length ? p[key].map(function (o) { return numc(o[0]) + ' ' + o[1] + '명'; }).join(' · ') : '–') + '</td>'; }).join('') : '<td class="muted" colspan="2">' + (p.it.essay ? '서술형' : '') + '</td>') : '<td class="r num">' + p.g + '</td>') + '<td class="cellbar"><i style="width:' + Math.max(2, p.r * 100) + '%"></i><span>' + pct(p.r) + '</span></td></tr>';
     }).join('') + '</tbody></table></div></section>';
 
   // 이번 세트 작품별
