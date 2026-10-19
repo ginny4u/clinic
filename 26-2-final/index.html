@@ -1348,13 +1348,18 @@ var FB_TYPE = {
   R4: '어휘의 문맥적 의미를 파악하는', M1: '화법·작문·매체 자료를 분석하는'
 };
 function fbJosa(w, a, b) { var c = String(w).charCodeAt(String(w).length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; }
-function fbWork(w, area) { return area === '문학' ? '「' + w + '」' : '\'' + w + '\''; }
-function fbGiven(name) { name = String(name || ''); return name.length === 3 ? name.slice(1) : name; }
+function fbWork(w) { return '‘' + w + '’'; }
+// 학부모 문자 호칭: 성을 빼고 받침 있으면 '이는', 없으면 '는' (예: 지호는, 서연이는)
+function fbWho(name) {
+  name = String(name || '').trim();
+  var g = name.length >= 4 ? name.slice(-2) : name.length >= 2 ? name.slice(1) : name;
+  return g + fbJosa(g, '이는', '는');
+}
 function fbPick(seed, arr) { var x = 0; for (var i = 0; i < seed.length; i++) x = (x * 31 + seed.charCodeAt(i)) % 9973; return arr[x % arr.length]; }
 
 function feedbackFor(set, sub, d) {
   var items = d.items[set.id] || [], n = items.length; if (!n || !sub) return '';
-  var st = d.stuById[sub.studentId] || {}, who = fbGiven(st.name) + ' 학생은', seed = sub.studentId + set.id;
+  var st = d.stuById[sub.studentId] || {}, who = fbWho(st.name), seed = sub.studentId + set.id;
   var X = function (it) { return sub.marks[it.no] === 'X'; };
   var wrong = items.filter(X), rate = (n - wrong.length) / n;
   var out = [];
@@ -1369,10 +1374,10 @@ function feedbackFor(set, sub, d) {
       .sort(function (a, b) { return b.b.x - a.b.x || b.b.x / b.b.n - a.b.x / a.b.n; });
     var top = works[0];
     if (wrong.length <= 2) {
-      out.push(who + ' 이번 주 오답이 ' + works.map(function (o) { return fbWork(o.w, o.b.area); }).join(', ') + ' ' + wrong.length + '문항에 그쳐 전반적으로 안정적입니다.');
+      out.push(who + ' 이번 주 오답이 ' + works.map(function (o) { return fbWork(o.w); }).join(', ') + ' ' + wrong.length + '문항에 그쳐 전반적으로 안정적입니다.');
     } else if (top.b.x >= 2 && top.b.x / wrong.length >= 0.4) {
       var w2 = works[1] && works[1].b.x >= 2 && works[1].b.x / wrong.length >= 0.3 ? works[1] : null;
-      out.push(who + ' 이번 주 ' + fbWork(top.w, top.b.area) + (w2 ? fbJosa(top.w, '과', '와') + ' ' + fbWork(w2.w, w2.b.area) : '') + ' 문항에서 오답이 집중되었습니다.');
+      out.push(who + ' 이번 주 ' + fbWork(top.w) + (w2 ? fbJosa(top.w, '과', '와') + ' ' + fbWork(w2.w) : '') + ' 문항에서 오답이 집중되었습니다.');
     } else {
       out.push(who + ' 이번 주 오답이 한 작품에 몰리지 않고 여러 작품에 고르게 나타났습니다.');
     }
@@ -1391,7 +1396,7 @@ function feedbackFor(set, sub, d) {
   // 2-1. 문법 개념 이름 (태그에 concept가 달려 있을 때만)
   var cons = [];
   wrong.forEach(function (it) { if (it.area === '문법' && it.concept && cons.indexOf(it.concept) < 0) cons.push(it.concept); });
-  if (cons.length) out.push('문법에서는 ' + cons.slice(0, 2).map(function (c) { return '\'' + c + '\''; }).join(', ') + ' 개념을 다시 정리할 필요가 있습니다.');
+  if (cons.length) out.push('문법에서는 ' + cons.slice(0, 2).map(function (c) { return '‘' + c + '’'; }).join(', ') + ' 개념을 다시 정리할 필요가 있습니다.');
 
   // 3. 무한선지 판단 습관: 옳은 선지를 놓쳤는지, 틀린 선지를 골랐는지
   var miss = 0, extra = 0;
@@ -1447,7 +1452,7 @@ function smsText(r) {
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
   if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
   if (r.extra && r.set.evalName) { lines.push(''); lines.push('■ ' + r.set.evalName + ' 성취도'); lines.push('- ' + r.extra + ' ( A+ / A / B / C / F)'); }
-  var note = getNote(r.set).trim(), fb = A.addFb ? fbText(r).trim() : '';
+  var fb = A.addFb ? fbText(r).trim() : '', note = A.addFb ? '' : getNote(r.set).trim();
   if (note || fb) { lines.push(''); lines.push('■ 클리닉 진행 사항'); if (note) lines.push('- ' + note); if (fb) lines.push('- ' + fb); }
   return lines.join('\n');
 }
@@ -1467,7 +1472,8 @@ function tabToday() {
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
     '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label><label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>' +
-    setsToday.map(function (set) {
+    (A.addFb ? '<p class="note">학생별 피드백을 넣는 동안에는 \'클리닉 진행 사항\'에 학생마다 다른 피드백 한 줄만 들어가요. 문자 카드 아래 칸에서 고칠 수 있어요.</p>' : '') +
+    (A.addFb ? [] : setsToday).map(function (set) {
       return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
         '<textarea id="note-' + set.id + '" data-note="' + set.id + '" rows="3" placeholder="오늘 클리닉에서는 …">' + h(getNote(set)) + '</textarea>';
     }).join('') + '</section>';
