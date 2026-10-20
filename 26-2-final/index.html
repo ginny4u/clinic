@@ -1317,10 +1317,11 @@ function tabStudents() {
   html += '<div class="toolbar"><div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
     return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
   }).join('') + '</div><input id="in-q" placeholder="이름 검색" value="' + h(A.q) + '"></div>';
-  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교</th><th class="r">제출</th><th class="r">정답률</th><th>약한 유형</th><th>상태</th><th></th></tr></thead><tbody>' +
+  var rowNo = 0;
+  html += '<div class="tscroll"><table class="t"><thead><tr><th class="r">번호</th><th>이름</th><th>학교</th><th class="r">제출</th><th class="r">정답률</th><th>약한 유형</th><th>상태</th><th></th></tr></thead><tbody>' +
     list.map(function (s) {
       var sm = studentSummary(s), cf = A.confirm && A.confirm.id === s.id ? A.confirm.op : null;
-      return '<tr data-name="' + h(s.name) + '" class="' + (s.status !== 'active' ? 'dim' : '') + '"><td><button class="link" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button></td><td>' + h(s.school) + '</td><td class="r num">' + sm.n + '</td>' +
+      return '<tr data-name="' + h(s.name) + '" class="' + (s.status !== 'active' ? 'dim' : '') + '"><td class="r num muted">' + (s.status === 'active' ? ++rowNo : '') + '</td><td><button class="link" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button></td><td>' + h(s.school) + '</td><td class="r num">' + sm.n + '</td>' +
         '<td class="r num">' + (sm.acc === null ? '–' : pct(sm.acc)) + '</td><td class="muted">' + h(sm.weak.join(', ')) + '</td>' +
         '<td>' + (s.status === 'active' ? (s.mustChange ? '<span class="tag">첫 로그인 전</span>' : '') : '<span class="tag">퇴원</span>') + '</td><td class="acts">' +
         '<button class="mini' + (cf === 'reset' ? ' arm' : '') + '" data-act="st-op" data-op="reset" data-id="' + s.id + '">' + (cf === 'reset' ? '한 번 더 누르면 0000' : '비번 초기화') + '</button>' +
