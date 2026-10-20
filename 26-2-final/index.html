@@ -279,7 +279,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 2;
+var CORE_VERSION = 3;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -375,7 +375,7 @@ function forStudent(items) {
 function resultFor(items, sub) {
   return items.map(function (it) {
     var r = { no: it.no, work: it.work, essay: !!it.essay, wrong: sub.marks[it.no] === 'X', blank: isBlank(it, sub) };
-    if (isOmr(it) && r.wrong) { r.ans = cleanPicks(it.ans, it.opts); r.picks = picksOf(sub, it.no); }
+    if (isOmr(it) && r.wrong && !r.blank) { r.ans = cleanPicks(it.ans, it.opts); r.picks = picksOf(sub, it.no); }
     return r;
   });
 }
@@ -418,7 +418,7 @@ function setStats(store, set, items, meId, fresh, subsList) {
   var cut = setCutoff(set, subs);
   var absent = store.students().filter(function (s) { return mates[s.id] && !doneIds[s.id] && String(s.joinedAt) <= cut; }).length;
   return { count: subs.length, of: subs.length + absent, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v; }).length : null, items: per,
-    few: subs.length < RANK_MIN && !!set.open };
+    few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
 
 var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1 };
@@ -482,7 +482,8 @@ var CORE_ACTIONS = {
     var mates = {}; store.students().forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
     var setIds = {}; sets.forEach(function (s) { setIds[s.id] = 1; });
     var bySetScores = {}, totals = {}, classType = {}, subCnt = {}, openSet = {}, subsAll = store.subs();
-    sets.forEach(function (s) { if (s.open) openSet[s.id] = 1; });
+    var newestAt = ''; sets.forEach(function (s) { if (String(s.createdAt || '') > newestAt) newestAt = String(s.createdAt || ''); });
+    sets.forEach(function (s) { if (s.open && String(s.createdAt || '') >= newestAt) openSet[s.id] = 1; }); // 진행 중인 주
     subsAll.forEach(function (sb) { if (mates[sb.studentId] && setIds[sb.setId]) subCnt[sb.setId] = (subCnt[sb.setId] || 0) + 1; });
     subsAll.forEach(function (sb) {
       if (!mates[sb.studentId] || !setIds[sb.setId]) return;
@@ -490,7 +491,7 @@ var CORE_ACTIONS = {
       var x = Object.keys(sb.marks).filter(function (k) { return sb.marks[k] === 'X'; }).length;
       (bySetScores[sb.setId] || (bySetScores[sb.setId] = [])).push({ id: sb.studentId, v: n ? (n - x) / n : 0 });
       var t = totals[sb.studentId] || (totals[sb.studentId] = { n: 0, ok: 0 }); t.n += n; t.ok += n - x;
-      if (!(openSet[sb.setId] && subCnt[sb.setId] < RANK_MIN)) its.forEach(function (it) {
+      if (!(openSet[sb.setId] && subCnt[sb.setId] < Math.min(RANK_MIN, Object.keys(mates).length))) its.forEach(function (it) {
         if (isBlank(it, sb)) return;
         var m = sb.marks[it.no], miss = m === 'X' || m === 'G' ? 1 : 0;
         it.types.forEach(function (ty) { var b = classType[ty] || (classType[ty] = { n: 0, miss: 0 }); b.n++; b.miss += miss; });
@@ -506,13 +507,18 @@ var CORE_ACTIONS = {
     var setRanks = {}, weekly = {}, allSubs = subsAll;
     sets.forEach(function (set) {
       var subsHere = bySetScores[set.id] || []; if (!subsHere.length) return;
-      if (subsHere.length < RANK_MIN && set.open) { setRanks[set.id] = { few: true, count: subsHere.length }; return; } // 아직 등수·누적에 넣지 않음
       var list = subsHere.slice(), done = {};
       list.forEach(function (o) { done[o.id] = 1; });
       var cut = setCutoff(set, allSubs.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; }));
       Object.keys(mates).forEach(function (id) { if (!done[id] && String(stuById[id].joinedAt) <= cut) list.push({ id: id, v: -1 }); });
-      var r = rankOf(list, st.id); if (r) { if (!done[st.id]) r.absent = true; setRanks[set.id] = r; }
-      list.forEach(function (o) { var w = weekly[o.id] || (weekly[o.id] = { n: 0, sum: 0 }); w.n++; w.sum += Math.max(0, o.v); });
+      // 진행 중인 주는 min(5명, 그 학교 인원)이 낼 때까지 등수·누적에 넣지 않음
+      if (openSet[set.id] && subsHere.length < Math.min(RANK_MIN, list.length)) { setRanks[set.id] = { few: true, count: subsHere.length }; return; }
+      var r = rankOf(list, st.id);
+      if (r) { if (!done[st.id]) { if (openSet[set.id]) r = { pending: true }; else r.absent = true; } setRanks[set.id] = r; }
+      list.forEach(function (o) {
+        if (o.v < 0 && openSet[set.id]) return;   // 진행 중인 주에 아직 안 낸 학생은 누적에 넣지 않음
+        var w = weekly[o.id] || (weekly[o.id] = { n: 0, sum: 0 }); w.n++; w.sum += Math.max(0, o.v);
+      });
     });
     var overallList = Object.keys(weekly).map(function (id) { return { id: id, v: weekly[id].sum / weekly[id].n }; });
     var classRates = {}; Object.keys(classType).forEach(function (k) { classRates[k] = classType[k].n ? classType[k].miss / classType[k].n : 0; });
@@ -664,6 +670,8 @@ var CORE_ACTIONS = {
     if (old && setIsOmr(oldItems) && req.v !== 2) return fail('화면이 예전 버전이에요. 새로고침한 뒤 다시 저장해 주세요.');
     if (old && omrSet && oldItems.length !== items.length && store.subs().some(function (sb) { return sb.setId === old.id && hasPicks(sb); }))
       return fail('이미 무한선지로 제출한 학생이 있어서 문항 수를 바꿀 수 없어요. (지금 ' + oldItems.length + '문항)');
+    if (old && omrSet && items.some(function (it, i) { return isOmr(it) !== isOmr(oldItems[i]); }) && store.subs().some(function (sb) { return sb.setId === old.id && hasPicks(sb); }))
+      return fail('이미 무한선지로 제출한 학생이 있어서 문항을 서술형과 객관식 사이로 바꿀 수 없어요.');
     var set = { id: old ? old.id : 'C' + env.uuid().replace(/-/g, '').slice(0, 10), school: String(s.school).trim(),
       week: String(s.week).trim(), title: String(s.title || (s.school + ' ' + s.week)).trim(),
       homework: (Array.isArray(s.homework) ? s.homework : []).map(function (h) { return String(h).trim(); }).filter(Boolean),
@@ -921,7 +929,7 @@ function viewHome() {
   html += '<div class="cards">' + open.map(function (s) {
     var r = rk.sets && rk.sets[s.id];
     return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '"><span class="card-k">' + h(s.week) + '</span><strong>' + h(s.title) + '</strong>' +
-      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : r && r.few ? ['등수 집계 중'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '미제출 · ' + s.total + '문항') + '</span></button>';
+      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : r && r.few ? ['등수 집계 중'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '아직 안 냄 · ' + s.total + '문항') + '</span></button>';
   }).join('') + '</div></section>';
 
   if (entries.length) {
@@ -930,7 +938,7 @@ function viewHome() {
       '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
       '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지 공개</small>' : '–')) + '</strong></div>' +
       '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · 총 ' + st.total.n + '문항</small></strong></div></div>' +
-      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 클리닉을 내지 않은 주는 꼴찌로 계산하고, 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나와요.</p>' + trend(entries) + '</section>';
+      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p>' + trend(entries) + '</section>';
     var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
     html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균이에요.</p>' +
       '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return myBar(TYPES[o.key] || o.key, o.b, cls[o.key], areaOfType(o.key)); }).join('') + '</div>' +
@@ -939,7 +947,7 @@ function viewHome() {
   if (closed.length) {
     html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
       var r = rk.sets && rk.sets[s.id];
-      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r && r.few ? '' : r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.total + '문항 중 ' + s.score + '개 맞힘' : (r ? '미제출' : '–')) + '</span></div>';
+      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r && (r.few || r.pending) ? '' : r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.total + '문항 중 ' + s.score + '개 맞힘' : (r ? '미제출' : '–')) + '</span></div>';
     }).join('') + '</div></section>';
   }
   return html + '</main>';
@@ -1013,7 +1021,10 @@ function viewForm() {
 }
 function draftKey(ff) { return 'omr.' + (S.me ? S.me.id : '') + '.' + (ff || F).set.id; }
 function saveDraft() { if (F && F.omr) store_set(draftKey(), JSON.stringify({ picks: F.picks, marks: F.marks })); }
-function loadDraft() { try { var d = JSON.parse(store_get(draftKey()) || 'null'); if (d) { F.picks = d.picks || {}; F.marks = d.marks || {}; } } catch (e) { } }
+function loadDraft() {
+  try { var d = JSON.parse(store_get(draftKey()) || 'null'); if (d) { F.picks = d.picks || {}; F.marks = d.marks || {}; } } catch (e) { }
+  (F.items || []).forEach(function (it) { if (isOmr(it) && F.picks[it.no]) F.picks[it.no] = cleanPicks(F.picks[it.no], Number(it.opts)); });
+}
 function dropDraft(ff) { store_set(draftKey(ff), null); }
 // 학생 화면에서 등수 숫자는 학교 인원의 상위 60%까지만 보여 준다(선생님 화면은 전부). 미제출은 숫자 대신 '미제출'.
 var RANK_SHOW = 0.6;
@@ -1080,7 +1091,7 @@ function resultBlocks(r) {
   if (r.detail) {
     var wrongs = r.detail.filter(function (d) { return d.wrong; }), nBl = wrongs.filter(function (d) { return d.blank; }).length;
     html += '<section class="sheet"><h2>틀린 문항 <small>' + (wrongs.length - nBl) + '개' + (nBl ? ' · 안 푼 문항 ' + nBl + '개' : '') + '</small></h2>' + (wrongs.length ? wrongs.map(function (d) {
-      if (d.blank && d.ans) return '<div class="res"><b>' + d.no + '</b><span class="rw">' + h(d.work) + ' <span class="mytag blanktag">안 푼 문항</span></span><span class="ra">정답 ' + d.ans.map(numc).join(' ') + '</span></div>';
+      if (d.blank) return '<div class="res"><b>' + d.no + '</b><span class="rw">' + h(d.work) + ' <span class="mytag blanktag">안 푼 문항</span></span><span class="ra muted">정답은 해설지에서 확인하세요.</span></div>';
       if (!d.ans) return '<div class="res"><b>' + d.no + '</b><span class="rw">' + h(d.work) + ' · 서술형</span><span class="ra">모범답안과 다시 비교해 보세요.</span></div>';
       var miss = d.ans.filter(function (k) { return d.picks.indexOf(k) < 0; }), extra = d.picks.filter(function (k) { return d.ans.indexOf(k) < 0; });
       return '<div class="res"><b>' + d.no + '</b><span class="rw">' + h(d.work) + '</span><span class="ra">정답 ' + d.ans.map(function (k) { return '<span class="' + (miss.indexOf(k) >= 0 ? 'miss' : '') + '">' + numc(k) + '</span>'; }).join(' ') +
@@ -1397,7 +1408,10 @@ function attReceive() {
   var ok = false;
   try {
     var a = JSON.parse(decodeURIComponent(m[1]));
-    if (a && a.v === 1 && Array.isArray(a.l)) { store_set('att', JSON.stringify({ d: String(a.d || ''), t: Number(a.t) || Date.now(), l: a.l.slice(0, 500) })); ok = true; }
+    if (a && a.v === 1 && Array.isArray(a.l)) {
+      var ll = a.l.filter(function (p) { return Array.isArray(p) && p.length >= 2; }).slice(0, 500).map(function (p) { return [String(p[0]), String(p[1])]; });
+      store_set('att', JSON.stringify({ d: String(a.d || ''), t: Number(a.t) || Date.now(), l: ll })); ok = true;
+    }
   } catch (e) { }
   try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
   setTimeout(function () { toast(ok ? '맥가이 출석 명단을 가져왔어요.' : '출석 명단을 읽지 못했어요. 맥가이에서 다시 눌러 주세요.', !ok); }, 300);
@@ -1410,6 +1424,7 @@ function attMatch(d) {
   var idx = {};
   d.students.forEach(function (st) { if (st.status !== 'active') return; var k = attNameKey(st.name) + '|' + attSchoolKey(fullSchool(st.school)); (idx[k] || (idx[k] = [])).push(st.id); });
   at.list.forEach(function (p) {
+    if (!Array.isArray(p)) return;
     var sk = attSchoolKey(p[1]); if (!mine[sk]) return;           // 우리 학교가 아니면(명덕여고 등) 건너뜀
     var k = attNameKey(p[0]) + '|' + sk;
     if (idx[k]) idx[k].forEach(function (id) { if (!out.ids[id]) { out.ids[id] = 1; out.n++; } });
@@ -1421,7 +1436,7 @@ function attHm(t) { var x = new Date(t); return ('0' + x.getHours()).slice(-2) +
 function attBox(am) {
   var how = '<details><summary>처음 한 번만: "출석 보내기" 북마크 만들기</summary>' +
     '<p class="note">Ctrl + Shift + B로 북마크 바를 켜고, 아래 빨간 "출석 보내기" 버튼을 끌어서 북마크 바에 놓으세요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "출석 보내기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
-    '<p class="note">쓸 때는 맥가이 클리닉수업관리 화면에서 일자를 오늘로 두고 검색한 뒤 "출석 보내기"를 누르면 돼요. 처음 한 번은 트래커가 새 탭으로 열리고, 그다음부터는 그 탭이 바로 바뀌어요.</p>' +
+    '<p class="note">쓸 때는 맥가이 클리닉수업관리 화면에서 일자를 오늘로 두고 검색한 뒤 "출석 보내기"를 누르면 돼요. 처음 한 번은 트래커가 새 탭으로 열리고, 그다음부터는 그 탭이 바로 바뀌어요. 새 탭이 열리면 원래 열어 둔 트래커 탭은 닫아 주세요. 두 탭에서 같이 숙제 검사를 하면 서로 덮어쓸 수 있어요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn bm attbm" href="' + h(attBookmarkHref()) + '" onclick="return false">출석 보내기</a><button class="btn" data-act="copy-attbm">코드 복사</button></div></details>';
   if (am.today) {
     return '<div class="attbox ok"><p><b>맥가이 출석 ' + am.n + '명</b> · ' + attHm(am.at.at) + '에 가져옴. 출석한 학생이 맨 위에 있어요. 더 온 학생이 있으면 맥가이에서 "출석 보내기"를 한 번 더 누르세요.</p>' +
@@ -1581,7 +1596,7 @@ function feedbackFor(set, sub, d) {
   if (!wrong.length && guessed && !nb) {
     out.push(who + ' 이번 주 틀린 문항은 없었지만 확신 없이 고른 문항이 ' + guessed + '개 있어, 그 문항의 근거를 다시 확인할 필요가 있습니다.');
   } else if (!wrong.length) {
-    out.push(nb ? '푼 문항은 모두 정확하게 맞혔습니다.' : who + ' 이번 주 확인 테스트를 모두 맞혀 범위 내용을 정확하게 이해하고 있습니다.');
+    if (nb < n) out.push(nb ? '푼 문항은 모두 정확하게 맞혔습니다.' : who + ' 이번 주 확인 테스트를 모두 맞혀 범위 내용을 정확하게 이해하고 있습니다.');
   } else {
     var byWork = {};
     items.forEach(function (it) { if (BL[it.no]) return; var b = byWork[it.work] || (byWork[it.work] = { n: 0, x: 0, area: it.area }); b.n++; if (X(it)) b.x++; });
@@ -1744,7 +1759,7 @@ function tabSets() {
       return '<tr><td>' + h(s.school) + '</td><td>' + h(s.week) + '</td><td>' + h(s.title) + '</td><td class="r num">' + (d.items[s.id] || []).length + '</td><td class="r num">' + subsFor(s.id).length + '/' + expectedFor(s).length + '</td>' +
         '<td><button class="chip ' + (s.open ? 'ok' : '') + '" data-act="toggle-open" data-id="' + s.id + '">' + (s.open ? '받는 중' : '마감') + '</button></td>' +
         '<td class="acts"><button class="mini" data-act="edit-set" data-id="' + s.id + '">편집</button><button class="mini' + (cf ? ' arm' : '') + '" data-act="del-set" data-id="' + s.id + '">' + (cf ? '한 번 더 누르면 삭제(제출 기록 포함)' : '삭제') + '</button></td></tr>';
-    }).join('') + '</tbody></table></div><p class="note">학생 화면에는 "받는 중"인 세트만 이번 주로 떠요. 지난주 세트는 마감해 두면 지난 클리닉으로 내려가요.</p>';
+    }).join('') + '</tbody></table></div><p class="note">학생 화면에는 "받는 중"인 세트만 이번 주로 떠요. 지난주 세트는 마감해 두면 지난 클리닉으로 내려가고, 그 주에 안 낸 학생은 꼴찌로 들어가요. 마감을 깜빡해도 같은 학교의 새 세트를 만들면 지난주는 마감된 것으로 계산해요.</p>';
   return html;
 }
 function setEditor() {
