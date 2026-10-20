@@ -81,6 +81,7 @@ textarea { resize: vertical; }
 
 .rows { display: flex; flex-direction: column; }
 .row { display: grid; grid-template-columns: 5em 1fr auto; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.row.past { grid-template-columns: 4em 1fr auto; } .row.past > span:last-child, .nw { white-space: nowrap; }
 .qrow { display: grid; grid-template-columns: 3.5em minmax(0, 9em) 1fr; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 
 .bar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(60px, 1.1fr) 4.6em; gap: 10px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); }
@@ -859,7 +860,7 @@ function viewHome() {
   html += '<div class="cards">' + open.map(function (s) {
     var r = rk.sets && rk.sets[s.id];
     return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '"><span class="card-k">' + h(s.week) + '</span><strong>' + h(s.title) + '</strong>' +
-      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? '제출 완료 · ' + s.score + '/' + s.total + (rankShown(r) ? ' · ' + r.of + '명 중 ' + r.rank + '등' : '') : '미제출 · ' + s.total + '문항') + '</span></button>';
+      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '미제출 · ' + s.total + '문항') + '</span></button>';
   }).join('') + '</div></section>';
 
   if (entries.length) {
@@ -877,7 +878,7 @@ function viewHome() {
   if (closed.length) {
     html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
       var r = rk.sets && rk.sets[s.id];
-      return '<div class="row"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.score + '/' + s.total : (r ? '미제출' : '–')) + '</span></div>';
+      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.total + '문항 중 ' + s.score + '개 맞힘' : (r ? '미제출' : '–')) + '</span></div>';
     }).join('') + '</div></section>';
   }
   return html + '</main>';
@@ -894,7 +895,7 @@ function trend(entries) {
   var W = 320, H = 96, pad = 20;
   var xs = function (i) { return pad + i * (W - pad * 2) / (pts.length - 1); }, ys = function (v) { return H - 20 - v * (H - 38); };
   var path = pts.map(function (p, i) { return (i ? 'L' : 'M') + xs(i).toFixed(1) + ' ' + ys(p.v).toFixed(1); }).join(' ');
-  return '<h3>주차별 우리 학교 안 등수</h3><p class="note">시험마다 난이도가 달라서 점수보다 같은 시험을 본 친구들 사이의 위치로 봐야 정확해요. 위로 갈수록 앞 등수예요.</p>' +
+  return '<h3>주차별 우리 학교 안 등수</h3><p class="note">시험마다 난이도가 달라서 점수보다 같은 시험을 본 친구들 사이의 위치로 봐야 정확해요.</p>' +
     '<div class="spark"><svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="주차별 우리 학교 안 등수">' +
     '<line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(1) + '" y2="' + ys(1) + '" class="grid"/><line x1="' + pad + '" x2="' + (W - pad) + '" y1="' + ys(0) + '" y2="' + ys(0) + '" class="grid"/>' +
     '<path d="' + path + '" class="line"/>' + pts.map(function (p, i) {
