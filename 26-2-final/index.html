@@ -1420,7 +1420,7 @@ function attMatch(d) {
 function attHm(t) { var x = new Date(t); return ('0' + x.getHours()).slice(-2) + ':' + ('0' + x.getMinutes()).slice(-2); }
 function attBox(am) {
   var how = '<details><summary>처음 한 번만: "출석 보내기" 북마크 만들기</summary>' +
-    '<p class="note">Ctrl + Shift + B로 북마크 바를 켜고, 아래 초록 버튼을 끌어서 북마크 바에 놓으세요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "출석 보내기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
+    '<p class="note">Ctrl + Shift + B로 북마크 바를 켜고, 아래 빨간 "출석 보내기" 버튼을 끌어서 북마크 바에 놓으세요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "출석 보내기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
     '<p class="note">쓸 때는 맥가이 클리닉수업관리 화면에서 일자를 오늘로 두고 검색한 뒤 "출석 보내기"를 누르면 돼요. 처음 한 번은 트래커가 새 탭으로 열리고, 그다음부터는 그 탭이 바로 바뀌어요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn bm attbm" href="' + h(attBookmarkHref()) + '" onclick="return false">출석 보내기</a><button class="btn" data-act="copy-attbm">코드 복사</button></div></details>';
   if (am.today) {
