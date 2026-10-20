@@ -367,6 +367,8 @@ function setCutoff(set, subsOfSet) {
 function hasPicks(sb) { return Object.keys((sb && sb.follow) || {}).some(function (k) { return /^p\d+$/.test(k); }); }
 // 같은 학교 재원생 기준: 이번 세트 등수, 문항별 오답률, 많이 틀린 선지 (학생 이름은 내보내지 않음)
 // subsList를 넘기면 시트를 다시 읽지 않는다(제출 직후 동시 제출이 몰릴 때 잠금 시간을 줄이려고)
+// 받는 중인 세트는 이 인원이 낼 때까지 학생에게 등수·오답률을 보여 주지 않는다(먼저 낸 학생이 1등으로 보이는 것 막기)
+var RANK_MIN = 5;
 function setStats(store, set, items, meId, fresh, subsList) {
   var mates = {};
   store.students().forEach(function (s) { if (s.status === 'active' && s.school === set.school) mates[s.id] = 1; });
@@ -391,7 +393,8 @@ function setStats(store, set, items, meId, fresh, subsList) {
   var doneIds = {}; subs.forEach(function (s) { doneIds[s.studentId] = 1; });
   var cut = setCutoff(set, subs);
   var absent = store.students().filter(function (s) { return mates[s.id] && !doneIds[s.id] && String(s.joinedAt) <= cut; }).length;
-  return { count: subs.length, of: subs.length + absent, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v; }).length : null, items: per };
+  return { count: subs.length, of: subs.length + absent, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v; }).length : null, items: per,
+    few: subs.length < RANK_MIN && !!set.open };
 }
 
 var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1 };
@@ -454,14 +457,16 @@ var CORE_ACTIONS = {
     // 같은 학교 재원생 기준 등수와 반 평균
     var mates = {}; store.students().forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
     var setIds = {}; sets.forEach(function (s) { setIds[s.id] = 1; });
-    var bySetScores = {}, totals = {}, classType = {};
-    store.subs().forEach(function (sb) {
+    var bySetScores = {}, totals = {}, classType = {}, subCnt = {}, openSet = {}, subsAll = store.subs();
+    sets.forEach(function (s) { if (s.open) openSet[s.id] = 1; });
+    subsAll.forEach(function (sb) { if (mates[sb.studentId] && setIds[sb.setId]) subCnt[sb.setId] = (subCnt[sb.setId] || 0) + 1; });
+    subsAll.forEach(function (sb) {
       if (!mates[sb.studentId] || !setIds[sb.setId]) return;
       var its = im[sb.setId] || [], n = its.length;
       var x = Object.keys(sb.marks).filter(function (k) { return sb.marks[k] === 'X'; }).length;
       (bySetScores[sb.setId] || (bySetScores[sb.setId] = [])).push({ id: sb.studentId, v: n ? (n - x) / n : 0 });
       var t = totals[sb.studentId] || (totals[sb.studentId] = { n: 0, ok: 0 }); t.n += n; t.ok += n - x;
-      its.forEach(function (it) {
+      if (!(openSet[sb.setId] && subCnt[sb.setId] < RANK_MIN)) its.forEach(function (it) {
         var m = sb.marks[it.no], miss = m === 'X' || m === 'G' ? 1 : 0;
         it.types.forEach(function (ty) { var b = classType[ty] || (classType[ty] = { n: 0, miss: 0 }); b.n++; b.miss += miss; });
       });
@@ -473,9 +478,10 @@ var CORE_ACTIONS = {
     // 클리닉을 내지 않은 재원생은 그 주 꼴찌로 센다(세트가 만들어진 뒤에 들어온 학생은 그 세트에서 뺌).
     // 누적 등수는 주마다의 정답률 평균으로 매기고, 안 낸 주는 0점으로 친다.
     var stuById = {}; store.students().forEach(function (s) { stuById[s.id] = s; });
-    var setRanks = {}, weekly = {}, allSubs = store.subs();
+    var setRanks = {}, weekly = {}, allSubs = subsAll;
     sets.forEach(function (set) {
       var subsHere = bySetScores[set.id] || []; if (!subsHere.length) return;
+      if (subsHere.length < RANK_MIN && set.open) { setRanks[set.id] = { few: true, count: subsHere.length }; return; } // 아직 등수·누적에 넣지 않음
       var list = subsHere.slice(), done = {};
       list.forEach(function (o) { done[o.id] = 1; });
       var cut = setCutoff(set, allSubs.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; }));
@@ -860,7 +866,7 @@ function viewHome() {
   html += '<div class="cards">' + open.map(function (s) {
     var r = rk.sets && rk.sets[s.id];
     return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '"><span class="card-k">' + h(s.week) + '</span><strong>' + h(s.title) + '</strong>' +
-      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '미제출 · ' + s.total + '문항') + '</span></button>';
+      '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : r && r.few ? ['등수 집계 중'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '미제출 · ' + s.total + '문항') + '</span></button>';
   }).join('') + '</div></section>';
 
   if (entries.length) {
@@ -869,7 +875,7 @@ function viewHome() {
       '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
       '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지 공개</small>' : '–')) + '</strong></div>' +
       '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · ' + st.total.n + '문항</small></strong></div></div>' +
-      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 클리닉을 내지 않은 주는 꼴찌로 계산해요.</p>' + trend(entries) + '</section>';
+      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 클리닉을 내지 않은 주는 꼴찌로 계산하고, 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나와요.</p>' + trend(entries) + '</section>';
     var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
     html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균이에요.</p>' +
       '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return myBar(TYPES[o.key] || o.key, o.b, cls[o.key], areaOfType(o.key)); }).join('') + '</div>' +
@@ -878,7 +884,7 @@ function viewHome() {
   if (closed.length) {
     html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
       var r = rk.sets && rk.sets[s.id];
-      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.total + '문항 중 ' + s.score + '개 맞힘' : (r ? '미제출' : '–')) + '</span></div>';
+      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r && r.few ? '' : r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? s.total + '문항 중 ' + s.score + '개 맞힘' : (r ? '미제출' : '–')) + '</span></div>';
     }).join('') + '</div></section>';
   }
   return html + '</main>';
@@ -961,7 +967,7 @@ function rankCut(of) { return Math.max(1, Math.floor(of * RANK_SHOW)); }
 function rankShown(r) { return !!r && !r.absent && r.rank <= rankCut(r.of); }
 function rankUpNote() {
   var rs = (HOME && HOME.ranks && HOME.ranks.sets) || {};
-  var done = HOME.sets.filter(function (s) { var r = rs[s.id]; return r && !r.absent; })
+  var done = HOME.sets.filter(function (s) { var r = rs[s.id]; return r && !r.absent && r.rank; })
     .sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
   if (done.length < 2) return '';
   var a = rs[done[done.length - 2].id], b = rs[done[done.length - 1].id];
@@ -1005,7 +1011,10 @@ function resultBlocks(r) {
         '<span class="ra rw">' + (miss.length ? '놓친 정답 ' + miss.map(numc).join(' ') : '') + (miss.length && extra.length ? ' · ' : '') + (extra.length ? '잘못 고른 번호 ' + extra.map(numc).join(' ') : '') + '</span></div>';
     }).join('') : '<p class="note">모두 맞혔어요!</p>') + '</section>';
   }
-  if (st && st.count) {
+  if (st && st.count && st.few) {
+    html += '<section class="sheet"><h2>우리 학교 이번 주 <small>' + st.count + '명 제출</small></h2>' +
+      '<p class="note">' + RANK_MIN + '명 이상 제출하면 이번 주 등수와 오답률이 높은 문항이 보여요. 친구들이 더 낸 뒤에 다시 열어 보세요.</p></section>';
+  } else if (st && st.count) {
     var mine = {}; (r.detail || []).forEach(function (d) { if (d.wrong) mine[d.no] = 1; });
     if (!r.detail && F && F.marks) Object.keys(F.marks).forEach(function (k) { if (F.marks[k] === 'X') mine[k] = 1; });
     var top = st.items.filter(function (o) { return o.miss > 0; }).sort(function (a, b) { return b.rate - a.rate || a.no - b.no; }).slice(0, 5);
