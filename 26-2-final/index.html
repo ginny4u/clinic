@@ -1742,7 +1742,7 @@ function copyText(text, el) {
 function newEdit(set) {
   var d = A.data;
   if (set) return { id: set.id, school: set.school, week: set.week, title: set.title, homework: set.homework.join(', '), open: set.open, items: JSON.parse(JSON.stringify(d.items[set.id] || [])), paste: '', err: '' };
-  return { id: null, school: d.schools[0] || '', week: '', title: '', homework: '자습서, 평가문제집, 수국, 자체교재', open: true, items: [], paste: '', err: '' };
+  return { id: null, school: '', week: '', title: '', homework: '자습서, 평가문제집, 수국, 자체교재', open: true, items: [], paste: '', err: '' };
 }
 function typeSelect(i, slot, val, area) {
   var opts = Object.keys(TYPES).filter(function (t) { return !area || areaOfType(t) === area || t === val; });
@@ -1767,9 +1767,10 @@ function setEditor() {
   var e = A.edit, d = A.data;
   var works = Array.from(new Set(Object.keys(d.items).reduce(function (a, k) { return a.concat(d.items[k].map(function (it) { return it.work; })); }, []).filter(Boolean))).sort();
   var html = '<section class="sheet stack"><div class="block-h"><h2>' + (e.id ? '세트 편집' : '새 클리닉 세트') + '</h2><button class="link" data-act="cancel-edit">취소</button></div>' +
-    '<div class="form-grid"><label>학교<input id="e-school" list="dl-school" value="' + h(e.school) + '"></label><label>주차<input id="e-week" value="' + h(e.week) + '" placeholder="10.3주"></label>' +
+    '<div class="form-grid"><label>학교<select id="e-school"><option value="">학교 고르기</option>' +
+    d.schools.concat(e.school && d.schools.indexOf(e.school) < 0 ? [e.school] : []).map(function (sc) {
+      return '<option value="' + h(sc) + '"' + (sc === e.school ? ' selected' : '') + '>' + h(sc) + '</option>'; }).join('') + '</select></label><label>주차<input id="e-week" value="' + h(e.week) + '" placeholder="10.3주"></label>' +
     '<label class="span2">제목<input id="e-title" value="' + h(e.title) + '" placeholder="비우면 학교+주차"></label><label class="span2">숙제 항목 (쉼표로 구분)<input id="e-hw" value="' + h(e.homework) + '"></label></div>' +
-    '<datalist id="dl-school">' + d.schools.map(function (s) { return '<option value="' + h(s) + '">'; }).join('') + '</datalist>' +
     '<datalist id="dl-work">' + works.map(function (w) { return '<option value="' + h(w) + '">'; }).join('') + '</datalist>' +
     '<details' + (e.items.length ? '' : ' open') + '><summary>Claude가 만든 태그 붙여 넣기</summary><p class="note">클리닉 파일을 Claude한테 주고 받은 내용을 이 칸에 붙여 넣은 뒤 "불러오기"를 눌러 주세요. 아래 표가 채워져요.</p>' +
     '<textarea id="e-paste" rows="5">' + h(e.paste) + '</textarea><div class="actions"><button class="btn" data-act="import-tags">불러오기</button></div></details>' +
@@ -1980,6 +1981,7 @@ function onClick(ev) {
   if (act === 'save-set') {
     readEditHeader();
     var e = A.edit;
+    if (!e.school) { e.err = '학교를 골라 주세요.'; return render(); }
     var bad = e.items.map(function (it, i) { return (!it.work || !it.types[0]) ? i + 1 : 0; }).filter(Boolean);
     if (bad.length) { e.err = '작품이나 유형 1이 빈 문항: ' + bad.slice(0, 12).join(', ') + (bad.length > 12 ? ' …' : '') + '번'; return render(); }
     var omrSet = e.items.some(function (it) { return !it.essay && it.opts > 0; });
