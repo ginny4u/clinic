@@ -130,6 +130,14 @@ textarea { resize: vertical; }
 .op.ess { border-radius: 4px; grid-column: span 2; font-family: var(--f-body); font-size: 0.92rem; }
 .op.ess.x { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
 .orow.todo .orow-h b { color: var(--accent); }
+.obar { position: sticky; top: 0; z-index: 5; margin: 0 -18px; padding: 8px 18px; background: var(--sheet); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line-strong);
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.92rem; }
+.obar-n { white-space: nowrap; } .obar b { font-size: 1.1rem; }
+.ogrp { margin-top: 14px; padding: 8px 0 4px; border-bottom: 2px solid var(--line-strong); font-weight: 700; font-size: 1.02rem; }
+.ogrp:first-child { margin-top: 0; }
+.ogrp small { color: var(--muted); font-weight: 400; font-size: 0.86rem; }
+.orow.flash { animation: oflash 2.6s ease-out; }
+@keyframes oflash { 0%, 60% { background: var(--warn-bg); box-shadow: -10px 0 0 var(--warn-bg), -14px 0 0 var(--warn), 10px 0 0 var(--warn-bg); } 100% { background: transparent; box-shadow: none; } }
 .res { display: grid; grid-template-columns: 3.2em minmax(0, 1fr); gap: 4px 10px; padding: 8px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
 .res b { font-family: var(--f-num); }
 .res .rw { color: var(--muted); font-size: 0.8rem; }
@@ -874,7 +882,7 @@ function viewHome() {
     html += '<section class="block"><h2>내 위치</h2><div class="kpis">' +
       '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
       '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지 공개</small>' : '–')) + '</strong></div>' +
-      '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · ' + st.total.n + '문항</small></strong></div></div>' +
+      '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · 총 ' + st.total.n + '문항</small></strong></div></div>' +
       rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 클리닉을 내지 않은 주는 꼴찌로 계산하고, 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나와요.</p>' + trend(entries) + '</section>';
     var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
     html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균이에요.</p>' +
@@ -978,9 +986,17 @@ function rankUpNote() {
 }
 var NUMC = '①②③④⑤⑥⑦⑧⑨⑩⑪⑫⑬⑭⑮⑯⑰⑱⑲⑳';
 function numc(k) { return NUMC.charAt(k - 1) || String(k); }
+function omrGroupHead(items, i) {
+  var w = String(items[i].work || '').trim();
+  if (!w || (i > 0 && String(items[i - 1].work || '').trim() === w)) return '';
+  var j = i; while (j + 1 < items.length && String(items[j + 1].work || '').trim() === w) j++;
+  var a = items[i].no, b = items[j].no;
+  return '<div class="ogrp">' + h(w) + ' <small>· ' + (a === b ? a + '번' : a + '~' + b + '번') + '</small></div>';
+}
 function omrSheet() {
   var done = 0, need = 0;
-  var rows = F.items.map(function (it) {
+  var rows = F.items.map(function (it, idx) {
+    var grp = omrGroupHead(F.items, idx);
     var head = '<div class="orow-h"><b>' + it.no + '</b><small>' + h(it.work) + (it.essay ? ' · 서술형' : '') + '</small></div>';
     if (isOmr(it)) {
       need++;
@@ -989,13 +1005,15 @@ function omrSheet() {
         var on = p.indexOf(k) >= 0;
         btns += '<button type="button" class="op' + (on ? ' on' : '') + '" data-act="opt" data-no="' + it.no + '" data-k="' + k + '" aria-pressed="' + on + '" aria-label="' + it.no + '번 ' + k + '번 선지">' + k + '</button>';
       }
-      return '<div class="orow' + (F.err && !p.length ? ' todo' : '') + '">' + head + '<div class="opts">' + btns + '</div></div>';
+      return grp + '<div class="orow' + (F.err && !p.length ? ' todo' : '') + '" id="orow-' + it.no + '">' + head + '<div class="opts">' + btns + '</div></div>';
     }
     var x = F.marks[it.no] === 'X';
-    return '<div class="orow">' + head + '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="ess" data-no="' + it.no + '" aria-pressed="' + x + '">' + (x ? '틀림' : '맞음') + '</button></div></div>';
+    return grp + '<div class="orow" id="orow-' + it.no + '">' + head + '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="ess" data-no="' + it.no + '" aria-pressed="' + x + '">' + (x ? '틀림' : '맞음') + '</button></div></div>';
   }).join('');
   return '<section class="sheet"><h2>복습 테스트</h2><p class="note">세트마다 내가 고른 번호를 <b>모두</b> 누르세요. 다시 누르면 취소돼요. ' +
     (F.items.some(function (it) { return it.essay; }) ? '서술형은 모범답안과 비교해서 틀렸으면 눌러서 "틀림"으로 바꾸세요. ' : '') + '제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없어요.</p>' +
+    '<div class="obar"><span class="obar-n"><b class="num">' + done + ' / ' + need + '</b> 입력</span>' +
+      (done < need ? '<button type="button" class="mini" data-act="to-empty">안 고른 문항으로</button>' : '<span class="oktxt">입력 완료</span>') + '</div>' +
     '<div class="omr">' + rows + '</div><div class="tally"><span>답을 고른 문항</span><strong class="num">' + done + ' / ' + need + '</strong></div></section>';
 }
 function resultBlocks(r) {
@@ -1515,7 +1533,6 @@ function smsText(r) {
   if (r.set.homework.length) lines.push('');
   lines.push('■ 확인 암기 테스트 성취도');
   lines.push(r.sub ? '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' : '- 미제출');
-  if (A.addWeak && r.weak.length) lines.push('- 보완이 필요한 부분: ' + r.weak.join(', '));
   if (r.extra && r.set.evalName) { lines.push(''); lines.push('■ ' + r.set.evalName + ' 성취도'); lines.push('- ' + r.extra + ' ( A+ / A / B / C / F)'); }
   var fb = A.addFb ? fbText(r).trim() : '', note = A.addFb ? '' : getNote(r.set).trim();
   if (note || fb) { lines.push(''); lines.push('■ 클리닉 진행 사항'); if (note) lines.push('- ' + note); if (fb) lines.push('- ' + fb); }
@@ -1536,7 +1553,7 @@ function tabToday() {
   setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
-    '<label class="inline"><input type="checkbox" id="chk-weak"' + (A.addWeak ? ' checked' : '') + '> 보완이 필요한 부분도 넣기</label><label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>' +
+    '<label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>' +
     (A.addFb ? '<p class="note">학생별 피드백을 넣는 동안에는 \'클리닉 진행 사항\'에 학생마다 다른 피드백 한 줄만 들어가요. 문자 카드 아래 칸에서 고칠 수 있어요.</p>' : '') +
     (A.addFb ? [] : setsToday).map(function (set) {
       return '<label for="note-' + set.id + '">' + h(fullSchool(set.school) + ' ' + set.week) + ' 클리닉 진행 사항 <small class="muted">(이 세트로 온 학생 모두에게 똑같이 들어가요. 다른 날 와도 그대로예요) </small><small id="note-st-' + set.id + '"></small></label>' +
@@ -1695,6 +1712,12 @@ function onClick(ev) {
   if (F && S.view === 'form') {
     keepMsg();
     if ((act === 'opt' || act === 'ess') && F && F.sending) return;
+    if (act === 'to-empty') {
+      var e1 = F.items.filter(function (it) { return isOmr(it) && !(F.picks[it.no] || []).length; })[0];
+      var el1 = e1 && document.getElementById('orow-' + e1.no);
+      if (el1) { el1.scrollIntoView({ block: 'center', behavior: 'smooth' }); el1.classList.remove('flash'); void el1.offsetWidth; el1.classList.add('flash'); }
+      return;
+    }
     if (act === 'opt') {
       var no2 = Number(t.dataset.no), k2 = Number(t.dataset.k), arr2 = (F.picks[no2] || []).slice(), at = arr2.indexOf(k2);
       if (at >= 0) arr2.splice(at, 1); else arr2.push(k2);
@@ -1836,7 +1859,6 @@ function onChange(ev) {
   }
   if (t.id === 'sel-ck') { A.ckSet = t.value; return render(); }
   if (t.id === 'sel-exam') { A.exam = t.value; store_set('exam', t.value); refreshSms(); return; }
-  if (t.id === 'chk-weak') { A.addWeak = t.checked; refreshSms(); return; }
   if (t.id === 'chk-fb') { A.addFb = t.checked; store_set('addFb', t.checked ? '1' : '0'); return renderKeep(); }
   if (t.id === 'in-day') { A.day = t.value || todayStr(); return render(); }
   if (t.id === 'sel-set') { A.setId = t.value; A.showAllItems = false; A.showAllQ = false; return render(); }
