@@ -1603,23 +1603,24 @@ function attBox(am) {
   if (am.at) return '<div class="attbox warn"><p>맥가이에서 가져온 출석 명단이 ' + h(am.at.day) + ' 날짜예요. 맥가이 일자를 오늘로 바꾸고 검색한 뒤 "출석 보내기"를 다시 눌러 주세요.</p>' + how + '</div>';
   return '<div class="attbox"><p>맥가이 클리닉수업관리 화면에서 "출석 보내기"를 누르면 출석한 학생이 맨 위로 올라와요.</p>' + how + '</div>';
 }
-// 0: 출석했는데 체크 전, 1: (출석 명단에 없고) 체크 전, 2: 오늘 체크함, 3: 어제 이전에 체크함
+// 0: 출석했는데 체크 전, 1: (출석 명단에 없고) 체크 전, 2: 오늘 체크함, 3: 어제 이전에 체크함, 4: 전에 체크했는데 오늘 또 출석
 // (체크 = 숙제·왔음·추가 평가 중 하나라도. 오늘 = 서버에 저장된 시각이 오늘이거나 이 화면에서 방금 누른 것)
 function ckGroup(setId, sid) {
   var g = gradesFor(setId)[sid] || {};
   if (Object.keys(g).length || extraOf(setId, sid)) {
     if (A.saving[setId + ':' + sid] !== undefined) return 2;
     var c = (A.data.checks || []).filter(function (x) { return x.setId === setId && x.studentId === sid; })[0];
-    return !c || localDay(c.checkedAt) === todayStr() ? 2 : 3;
+    if (!c || localDay(c.checkedAt) === todayStr()) return 2;
+    return A.attIds && A.attIds[sid] ? 4 : 3;
   }
   return A.attIds && A.attIds[sid] ? 0 : 1;
 }
 function ckDivHtml(grp) {
-  var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생' : '전에 체크한 학생';
+  var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생' : grp === 4 ? '오늘 또 온 학생 (이번 주 체크는 끝남)' : '전에 체크한 학생';
   return '<div class="ck-div" data-grp="' + grp + '">' + t + '</div>';
 }
-// 출석을 가져왔으면 출석·체크 전 → 오늘 체크 → 출석 명단에 없는 학생 → 전에 체크, 아니면 체크 전 → 오늘 체크 → 전에 체크
-function ckRank(g) { return A.attN ? [0, 2, 1, 3][g] : g; }
+// 출석을 가져왔으면 출석·체크 전 → 또 온 학생 → 오늘 체크 → 출석 명단에 없는 학생 → 전에 체크, 아니면 체크 전 → 오늘 체크 → 전에 체크
+function ckRank(g) { return A.attN ? [0, 3, 2, 4, 1][g] : g; }
 function ckCmp(a, b) { return ckRank(a.g) - ckRank(b.g) || a.name.localeCompare(b.name); }
 // 지금 화면 순서가 체크 상태와 어긋났는지 보고 '정리' 버튼·남은 인원을 갱신
 function ckMark() {
