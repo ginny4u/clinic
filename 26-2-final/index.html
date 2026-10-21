@@ -277,6 +277,8 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .smslist { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
 .sms { background: var(--sheet); border: 1px solid var(--line); padding: 12px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .sms textarea { width: 100%; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
+.fbgrp { display: grid; grid-template-columns: 3.4em minmax(0, 1fr); gap: 6px; align-items: start; }
+.fbgrp > span { font-size: 0.72rem; color: var(--muted); padding-top: 3px; white-space: nowrap; }
 .fbchips { gap: 4px; }
 .fbchips .chip { font-size: 0.74rem; padding: 2px 8px; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
@@ -1944,7 +1946,11 @@ function feedbackFor(set, sub, d) {
       : weakType && FB_DID[weakType] && byType[weakType].n < done.length * 0.8 ? pick('c2', FB_DID[weakType])
       : pick('c2', ['관련 개념을 예시와 함께 다시 설명했습니다.', '헷갈린 개념을 예시를 들어 다시 정리해 주었습니다.']);
     var lead3 = nb ? (praise ? '다만 ' : '푼 문항 중에서는 ') : contrast ? '다만 ' : '';
-    mid.push(lead3 + where + ' 오답이 ' + (nb || strong ? pick('c', ['이어져, ', '많아, ']) : '나와, ') + did);
+    // 내용(L1)은 잘 알고 있는데 출제 요소(표현·시어·태도·〈보기〉·비교)에서 틀렸으면 그 대비를 그대로 말한다
+    var knowsL1 = byType.L1 && byType.L1.n >= 3 && byType.L1.x / byType.L1.n <= 0.15;
+    if (useType && !nb && knowsL1 && /^L[2-6]$/.test(weakType))
+      mid.push('작품의 내용 자체는 잘 기억하고 있지만, ' + (weakType === 'L5' || weakType === 'L6' ? fbWorkAsk(weak[0].w, weakType) : fbWork(weak[0].w) + '의 ' + FB_ASK[weakType]) + '처럼 시험에 자주 출제되는 요소는 아직 어려워해, ' + did);
+    else mid.push(lead3 + where + ' 오답이 ' + (nb || strong ? pick('c', ['이어져, ', '많아, ']) : '나와, ') + did);
   } else if (wrong.length >= 3 && acc < 0.9) {
     var wtAll = Object.keys(byType).filter(function (t) { var b = byType[t]; return b.x >= 1.5 && b.x / b.n >= 0.4 && FB_TYPE[t] && FB_DID[t] && b.n < done.length * 0.8; })
       .sort(function (a, b) { return byType[b].x / byType[b].n - byType[a].x / byType[a].n; });
@@ -1983,8 +1989,8 @@ function feedbackFor(set, sub, d) {
   else if (again) plan = pick('e', ['이 유형은 지난 클리닉에서도 오답이 있었던 부분이라, 다음 클리닉까지 중점적으로 보완하고자 합니다.', '지난 클리닉에서도 같은 유형에서 오답이 있었던 만큼, 다음 클리닉까지 이 부분을 집중적으로 보완하는 방향으로 지도하고자 합니다.']);
   else if (weakWork || weakType) plan = pick('e', ['다음 클리닉에서 이 부분이 얼마나 안정되는지 확인해 보고자 합니다.', '비슷한 문항으로 한 번 더 확인하며 이 부분을 확실히 다지는 방향으로 지도하고자 합니다.']);
   else if (!wrong.length && !guessed) plan = null;
-  else if (acc >= 0.9) plan = pick('e', ['남은 기간에는 사소한 실수를 줄이는 데 집중하는 방향으로 지도하고자 합니다.', '지금의 흐름을 ' + exam + '까지 이어 갈 수 있도록 꾸준히 점검하고자 합니다.']);
-  else if (wrong.length) plan = pick('e', ['같은 실수를 반복하지 않도록 다음 클리닉에서도 꾸준히 점검하고자 합니다.', '다음 클리닉에서도 비슷한 문항으로 한 번 더 확인하고자 합니다.']);
+  else if (acc >= 0.9) plan = pick('e', ['남은 기간에는 사소한 실수를 줄이는 데 집중하는 방향으로 지도하고자 합니다.', '지금의 흐름을 ' + exam + '까지 이어 갈 수 있도록 꾸준히 점검하고자 합니다.', '다음 클리닉은 하지 않을 수 있는 실수를 줄이는 것을 목표로 진행해 보기로 했습니다.']);
+  else if (wrong.length) plan = pick('e', ['같은 실수를 반복하지 않도록 다음 클리닉에서도 꾸준히 점검하고자 합니다.', '다음 클리닉에서도 비슷한 문항으로 한 번 더 확인하고자 합니다.', '다음 클리닉에서는 안 틀릴 수 있는 문항은 절대 틀리지 않는 것을 목표로 해 보기로 했습니다.']);
   if (!nb && !wrong.length && !guessed) ask = pick('f', ['많이 칭찬해 주세요!', '집에서도 많은 칭찬 부탁 드립니다!']);
   else if (!nb && prev && delta >= 0.08 && acc >= 0.6) ask = '집에서도 많은 격려와 칭찬 부탁 드립니다!';
   else if (!nb && ((prev && delta <= -0.15) || acc < 0.5)) ask = '집에서도 많이 격려해 주시면 좋을 것 같습니다.';
@@ -2010,39 +2016,61 @@ function fbText(r) {
   if (A.fbEdit[k] !== undefined) return A.fbEdit[k];
   return r.sub ? feedbackFor(r.set, r.sub, A.data) : '';
 }
-// 누르면 피드백 칸에 들어가는 선생님 말투 한마디(다시 누르면 빠짐)
+// 누르면 피드백 칸에 들어가는 선생님 말투 한마디(다시 누르면 빠짐). [묶음, 버튼 이름, 문장] — {편}은 'ㅇㅇ이 편에'
 var FB_CHIPS = [
-  ['대견함', '수업 시간에 강조한 부분을 스스로 적용해 보려는 모습이 보여 대견합니다.'],
-  ['질문 적극적', '질문의 내용이 점점 구체적이고 적극적으로 변하고 있는 모습이 기특합니다.'],
-  ['과제 성실', '과제를 꼼꼼하게 해 와서 많이 칭찬했습니다.'],
-  ['과제 미흡', '과제를 충분히 해 오지 못해 아쉽습니다. 다음 클리닉까지는 꼭 완료해 올 수 있도록 이야기했습니다.'],
-  ['너무 빨리 풂', '문제를 너무 빨리 풀어 실수가 나온 만큼, 시간이 걸리더라도 지문과 선지를 끝까지 꼼꼼히 읽고 풀어야 한다고 강조했습니다.'],
-  ['단어 지레짐작', '모르는 단어의 뜻을 지레짐작하고 넘어간 부분이 있어, 모르는 단어는 바로바로 찾아보는 습관을 들여야 한다고 이야기했습니다.'],
-  ['꽂힌 단어로 판단', '선지 전체를 읽지 않고 눈에 띄는 단어만으로 정오를 판단하는 경우가 있어, 선지는 반드시 끝까지 읽고 판단해야 한다고 강조했습니다.'],
-  ['집중력', '뒤로 갈수록 집중력이 흐트러지는 모습이 보여, 끝까지 같은 집중력으로 풀 수 있도록 지도했습니다.'],
-  ['의기소침', '점수가 생각만큼 나오지 않아 의기소침해하는 모습이라, 지금은 틀린 부분을 하나씩 채워 가는 과정이니 일희일비할 필요 없다고 다독였습니다. 집에서도 많이 격려해 주시면 좋을 것 같습니다.'],
-  ['칭찬 부탁', '집에서도 많은 칭찬과 격려 부탁 드립니다!']
+  ['칭찬', '대견함', '수업 시간에 강조한 부분을 스스로 적용해 보려는 모습이 보여 대견합니다.'],
+  ['칭찬', '질문 적극적', '질문의 내용이 점점 구체적이고 적극적으로 변하고 있는 모습이 기특합니다.'],
+  ['칭찬', '끝까지 질문', '대부분의 학생들이 클리닉만 끝내고 가기에 급급한데, 모르는 부분을 모두 질문하고 가는 점이 아주 기특합니다.'],
+  ['칭찬', '과제 성실', '과제를 꼼꼼하게 해 와서 많이 칭찬했습니다.'],
+  ['칭찬', '개선 노력', '틀린 부분을 스스로 확실히 인지하고 개선하려는 노력도 충분히 하고 있어, 앞으로 더 잘하리라 생각합니다.'],
+  ['짚은 점', '너무 빨리 풂', '문제를 너무 빨리 풀어 실수가 나온 만큼, 시간이 걸리더라도 지문과 선지를 끝까지 꼼꼼히 읽고 풀어야 한다고 강조했습니다.'],
+  ['짚은 점', '단어 지레짐작', '모르는 단어의 뜻을 지레짐작하고 넘어간 부분이 있어, 모르는 단어는 바로바로 찾아보는 습관을 들여야 한다고 이야기했습니다.'],
+  ['짚은 점', '꽂힌 단어로 판단', '선지 전체를 읽지 않고 눈에 띄는 단어만으로 정오를 판단하는 경우가 있어, 선지는 반드시 끝까지 읽고 판단해야 한다고 강조했습니다.'],
+  ['짚은 점', '주관 개입', '선지를 판단할 때 객관적 근거 대신 주관적인 생각이 개입하는 경우가 많아, 이 부분은 반드시 의식하고 고칠 수 있도록 독려했습니다.'],
+  ['짚은 점', '오답 고민 부족', '오답을 충분히 고민하지 않고 질문하러 오는 경우가 있어, 스스로 정답과 오답의 근거를 치열하게 고민해 본 뒤 질문할 수 있도록 지도했습니다.'],
+  ['짚은 점', '집중력', '뒤로 갈수록 집중력이 흐트러지는 모습이 보여, 끝까지 같은 집중력으로 풀 수 있도록 지도했습니다.'],
+  ['짚은 점', '컨디션', '컨디션이 좋지 않아서 그런지 평소라면 하지 않았을 실수들이 있어 본인도 많이 아쉬워했습니다.'],
+  ['짚은 점', '의기소침', '점수가 생각만큼 나오지 않아 의기소침해하는 모습이라, 지금은 틀린 부분을 하나씩 채워 가는 과정이니 일희일비할 필요 없다고 다독였습니다. 집에서도 많이 격려해 주시면 좋을 것 같습니다.'],
+  ['짚은 점', '과제 미흡', '과제를 충분히 해 오지 못해 아쉽습니다. 다음 클리닉까지는 꼭 완료해 올 수 있도록 이야기했습니다.'],
+  ['마무리', '오답 정리·질문 후 하원', '틀린 문항은 꼼꼼하게 오답 정리하고, 모르는 내용을 모두 질문한 뒤 하원했습니다.'],
+  ['마무리', '과제 마치고 하원', '미흡한 과제는 모두 마치고 하원했습니다.'],
+  ['마무리', '녹화본 복습 부탁', '지난 수업 녹화본을 {편} 전송했습니다. 다음 수업 전까지 지난 수업 내용을 다시 한 번 복습하고 올 수 있도록 챙겨 주시면 감사하겠습니다.'],
+  ['마무리', '칭찬 부탁', '집에서도 많은 칭찬과 격려 부탁 드립니다!'],
+  ['마무리', '^^', '^^']
 ];
-var FB_ASK_END = /(부탁 드립니다!|주시면 좋을 것 같습니다\.|칭찬해 주세요!)$/;
-// 한마디를 넣거나 뺀다. 학부모님께 부탁하는 문장이 끝에 있으면 그 앞에 넣는다.
+var FB_ASK_RE = /(부탁 드립니다!|좋을 것 같습니다\.|감사하겠습니다\.|칭찬해 주세요!)(\^\^)?$/;
+var FB_END_RE = /(고자 합니다\.|기로 했습니다\.|하원했습니다\.)(\^\^)?$/;
+function fbChipText(c, r) {
+  var g = String(r.st.name || '').trim(); g = g.length >= 4 ? g.slice(-2) : g.length >= 2 ? g.slice(1) : g;
+  return c[2].replace('{편}', g + fbJosa(g, '이', '') + ' 편에');
+}
+function fbChipOn(text, chip) { return chip === '^^' ? /\^\^$/.test(text) : text.indexOf(chip) >= 0; }
+// 한마디를 넣거나 뺀다. 칭찬·짚은 점은 마무리(다짐·하원) 문장 앞에, 하원 문장은 학부모님께 부탁하는 문장 앞에, 부탁은 맨 끝에.
 function fbChipToggle(text, chip) {
   text = String(text || '').trim();
-  if (text.indexOf(chip) >= 0) return text.replace(chip, '').replace(/\s{2,}/g, ' ').trim();
+  if (chip === '^^') return /\^\^$/.test(text) ? text.replace(/\^\^$/, '') : text + '^^';
+  if (text.indexOf(chip) >= 0) return text.replace(chip, '').replace(/\s+\^\^/g, '^^').replace(/\s{2,}/g, ' ').trim();
   if (!text) return chip;
-  if (!FB_ASK_END.test(chip)) {
-    var m = text.match(/^([\s\S]*?[.!?])\s+([^.!?]*(?:부탁 드립니다!|주시면 좋을 것 같습니다\.|칭찬해 주세요!))$/);
-    if (m) return m[1] + ' ' + chip + ' ' + m[2];
-  }
-  return text + ' ' + chip;
+  var smile = /\^\^$/.test(text) ? '^^' : ''; if (smile) text = text.slice(0, -2);
+  var parts = (text.match(/[^.!?]*[.!?]+(?:\^\^)?/g) || []).map(function (x) { return x.trim(); }).filter(Boolean);
+  if (parts.join('').replace(/\s/g, '') !== text.replace(/\s/g, '')) return text + ' ' + chip + smile; // 문장 부호 없이 끝나면 그냥 뒤에
+  var kind = FB_ASK_RE.test(chip) ? 'ask' : FB_END_RE.test(chip) ? 'end' : 'mid', at = parts.length;
+  if (kind !== 'ask') while (at > 0 && (FB_ASK_RE.test(parts[at - 1]) || (kind === 'mid' && FB_END_RE.test(parts[at - 1])))) at--;
+  parts.splice(at, 0, chip);
+  return parts.join(' ') + smile;
 }
 function fbBox(r, i) {
   if (!A.addFb || (!r.sub && r.n)) return '';
   var edited = A.fbEdit[fbKey(r)] !== undefined, cur = fbText(r);
   return '<div class="fbl"><span>개인 피드백' + (edited ? ' <b>· 고친 문장</b>' : r.sub ? ' · 자동' : ' · 비어 있음') + '</span>' + (edited ? '<button class="mini" data-act="fb-reset" data-i="' + i + '">자동 문장으로</button>' : '') + '</div>' +
     '<textarea data-fb="' + i + '" rows="5" aria-label="' + h(r.st.name) + ' 개인 피드백" placeholder="버튼을 누르거나 직접 쓰면 진행 사항 뒤에 이어져요.">' + h(cur) + '</textarea>' +
-    '<div class="chips fbchips" aria-label="한마디 넣기">' + FB_CHIPS.map(function (c, j) {
-      return '<button class="chip' + (cur.indexOf(c[1]) >= 0 ? ' on' : '') + '" data-act="fb-chip" data-i="' + i + '" data-c="' + j + '" title="' + h(c[1]) + '">' + h(c[0]) + '</button>';
-    }).join('') + '</div>';
+    ['칭찬', '짚은 점', '마무리'].map(function (gname) {
+      return '<div class="fbgrp"><span>' + gname + '</span><div class="chips fbchips">' + FB_CHIPS.map(function (c, j) {
+        if (c[0] !== gname) return '';
+        var tx = fbChipText(c, r);
+        return '<button class="chip' + (fbChipOn(cur, tx) ? ' on' : '') + '" data-act="fb-chip" data-i="' + i + '" data-c="' + j + '" title="' + h(tx) + '">' + h(c[1]) + '</button>';
+      }).join('') + '</div></div>';
+    }).join('');
 }
 function smsText(r) {
   var exam = A.exam || '기말고사';
@@ -2374,7 +2402,7 @@ function onClick(ev) {
   }
   if (act === 'fb-chip') {
     var r7 = A.todayRows[Number(t.dataset.i)], c7 = FB_CHIPS[Number(t.dataset.c)];
-    if (r7 && c7) { var k7 = fbKey(r7), nt = fbChipToggle(fbText(r7), c7[1]); A.fbEdit[k7] = nt; store_set('fb.' + k7, nt); }
+    if (r7 && c7) { var k7 = fbKey(r7), nt = fbChipToggle(fbText(r7), fbChipText(c7, r7)); A.fbEdit[k7] = nt; store_set('fb.' + k7, nt); }
     return renderKeep();
   }
   if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) { var k8 = fbKey(r8); delete A.fbEdit[k8]; store_set('fb.' + k8, null); } return renderKeep(); }
