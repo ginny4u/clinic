@@ -1683,7 +1683,7 @@ function fbWork(w) { return '‘' + w + '’'; }
 function fbUnit(items) {
   var c = {}; (items || []).forEach(function (it) { c[it.area || ''] = (c[it.area || ''] || 0) + 1; });
   var top = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; })[0];
-  return top === '문학' ? '작품' : '주제';
+  return top === '문학' ? '작품' : '영역';
 }
 // 학부모 문자 호칭: 성을 빼고 받침 있으면 '이는', 없으면 '는' (예: 지호는, 서연이는)
 function fbWho(name) {
@@ -1723,9 +1723,9 @@ function feedbackFor(set, sub, d) {
       out.push((nb ? '푼 문항 중에서는 ' : who + ' 이번 주 ') + fbWork(top.w) + (w2 ? fbJosa(top.w, '과', '와') + ' ' + fbWork(w2.w) : '') + ' 문항에서 오답이 집중되었습니다.');
     } else {
       var tops2 = works.filter(function (o) { return o.b.x >= 2; }).slice(0, 2);
-      if (unit === '주제' && tops2.length) {
+      if (unit === '영역' && tops2.length) {
         // 문법은 주제 이름이 곧 개념이라, 고르게 틀렸어도 상대적으로 많이 틀린 주제를 짚어 줌
-        out.push((nb ? '푼 문항 중 오답은 ' : who + ' 이번 주 오답이 ') + '한 주제에 몰리지 않고 여러 주제에 나뉘어 있었고, 그중 ' +
+        out.push((nb ? '푼 문항 중 오답은 ' : who + ' 이번 주 오답이 ') + '한 영역에 몰리지 않고 여러 영역에 나뉘어 있었고, 그중 ' +
           fbWork(tops2[0].w) + (tops2[1] ? fbJosa(tops2[0].w, '과', '와') + ' ' + fbWork(tops2[1].w) : '') + ' 문항에서 상대적으로 많이 틀렸습니다.');
       } else out.push(nb ? '푼 문항 중 오답은 한 ' + unit + '에 몰리지 않고 여러 ' + unit + '에 고르게 나타났습니다.' : who + ' 이번 주 오답이 한 ' + unit + '에 몰리지 않고 여러 ' + unit + '에 고르게 나타났습니다.');
     }
