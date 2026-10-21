@@ -286,7 +286,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 6;
+var CORE_VERSION = 7;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -1617,8 +1617,11 @@ function flushChecks() {
     A.dirty[setId] = {};
     var g = gradesFor(setId);
     ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; refreshCkRow(setId, id); });
-    api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {}, extra: extraOf(setId, id) }; }) }).then(function (r) {
+    var sent = {}; ids.forEach(function (id) { sent[id] = extraOf(setId, id); });
+    api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {}, extra: sent[id] }; }) }).then(function (r) {
       ids.forEach(function (id) { A.saving[setId + ':' + id] = r.ok ? 'ok' : 'err'; });
+      if (r.ok && r.saved.some(function (c) { return sent[c.studentId] && c.extra !== sent[c.studentId]; }))
+        toast('서버(앱스 스크립트)가 예전 버전이라 \'왔음\'과 추가 평가가 저장되지 않았어요. 새 omr 파일(v12)을 올리고 새 버전으로 배포해 주세요.', true);
       if (r.ok) {
         r.saved.forEach(function (c) {
           delete A.extras[c.setId + ':' + c.studentId];
