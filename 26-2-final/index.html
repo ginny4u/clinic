@@ -266,6 +266,10 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .qbtn.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
 .steps { margin: 0; padding-left: 1.3em; display: flex; flex-direction: column; gap: 4px; }
 .btn.bm { text-decoration: none; background: var(--accent); border-color: var(--accent); color: var(--accent-ink); cursor: grab; }
+.ck-bar { position: sticky; top: 0; z-index: 5; background: var(--paper); padding: 8px 0; }
+.ck-left { font-size: 0.9rem; color: var(--muted); white-space: nowrap; }
+.ck-div { padding: 6px 12px; font-size: 0.8rem; font-weight: 700; color: var(--muted); background: var(--paper); border-bottom: 1px solid var(--line); }
+.ckrow.done .ck-name strong { color: var(--muted); }
 .ck-bar .ck-search { flex: 1; max-width: 420px; font-size: 1.1rem; padding: 12px 14px; }
 .oktxt { color: var(--ok); }
 .cklist.one .ckrow { padding: 18px 16px; }
@@ -1591,11 +1595,43 @@ function attBox(am) {
     '<p class="note">쓸 때는 맥가이 클리닉수업관리 화면에서 일자를 오늘로 두고 검색한 뒤 "출석 보내기"를 누르면 돼요. 처음 한 번은 트래커가 새 탭으로 열리고, 그다음부터는 그 탭이 바로 바뀌어요. 새 탭이 열리면 원래 열어 둔 트래커 탭은 닫아 주세요. 두 탭에서 같이 숙제 검사를 하면 서로 덮어쓸 수 있어요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn bm attbm" href="' + h(attBookmarkHref()) + '" onclick="return false">출석 보내기</a><button class="btn" data-act="copy-attbm">코드 복사</button></div></details>';
   if (am.today) {
-    return '<div class="attbox ok"><p><b>맥가이 출석 ' + am.n + '명</b> · ' + attHm(am.at.at) + '에 가져옴. 출석한 학생이 맨 위에 있어요. 더 온 학생이 있으면 맥가이에서 "출석 보내기"를 한 번 더 누르세요.</p>' +
+    return '<div class="attbox ok"><p><b>맥가이 출석 ' + am.n + '명</b> · ' + attHm(am.at.at) + '에 가져옴. 출석했는데 아직 체크 안 한 학생이 맨 위에 있어요. 더 온 학생이 있으면 맥가이에서 "출석 보내기"를 한 번 더 누르세요.</p>' +
       (am.extra.length ? '<p class="badtxt">트래커 명단에 없는 학생: ' + am.extra.map(h).join(', ') + ' → "학생" 탭에서 추가해 주세요.</p>' : '') + how + '</div>';
   }
   if (am.at) return '<div class="attbox warn"><p>맥가이에서 가져온 출석 명단이 ' + h(am.at.day) + ' 날짜예요. 맥가이 일자를 오늘로 바꾸고 검색한 뒤 "출석 보내기"를 다시 눌러 주세요.</p>' + how + '</div>';
   return '<div class="attbox"><p>맥가이 클리닉수업관리 화면에서 "출석 보내기"를 누르면 출석한 학생이 맨 위로 올라와요.</p>' + how + '</div>';
+}
+// 0: 출석했는데 체크 전, 1: (출석 명단에 없고) 체크 전, 2: 체크함(숙제·왔음·추가 평가 중 하나라도)
+function ckGroup(setId, sid) {
+  var g = gradesFor(setId)[sid] || {};
+  if (Object.keys(g).length || extraOf(setId, sid)) return 2;
+  return A.attIds && A.attIds[sid] ? 0 : 1;
+}
+function ckDivHtml(grp) {
+  var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : '체크한 학생';
+  return '<div class="ck-div" data-grp="' + grp + '">' + t + '</div>';
+}
+function ckCmp(a, b) { return a.g - b.g || a.name.localeCompare(b.name); }
+// 지금 화면 순서가 체크 상태와 어긋났는지 보고 '정리' 버튼·남은 인원을 갱신
+function ckMark() {
+  var list = $('#ck-list'); if (!list) return;
+  var rows = [].slice.call(list.querySelectorAll('.ckrow')), left = 0;
+  var info = rows.map(function (el) { var g = ckGroup(el.dataset.set, el.dataset.st); el.classList.toggle('done', g === 2); if (g < 2) left++; return { el: el, g: g, name: el.dataset.name }; });
+  var sorted = info.slice().sort(ckCmp), off = sorted.some(function (o, i) { return o.el !== info[i].el; });
+  var btn = $('#ck-sort'); if (btn) btn.hidden = !off;
+  var cnt = $('#ck-left'); if (cnt) cnt.textContent = left ? '체크 전 ' + left + '명' : '모두 체크했어요';
+}
+// 체크한 학생을 아래로(행을 다시 그리지 않고 순서만 바꿔서 검색창 입력이 끊기지 않게)
+function ckResort() {
+  var list = $('#ck-list'); if (!list) return;
+  var info = [].slice.call(list.querySelectorAll('.ckrow')).map(function (el) { return { el: el, g: ckGroup(el.dataset.set, el.dataset.st), name: el.dataset.name }; }).sort(ckCmp);
+  [].slice.call(list.querySelectorAll('.ck-div')).forEach(function (x) { x.remove(); });
+  var cur = -1;
+  info.forEach(function (o) {
+    if (o.g !== cur) { cur = o.g; list.insertAdjacentHTML('beforeend', ckDivHtml(o.g)); }
+    list.appendChild(o.el);
+  });
+  applyFilter();
 }
 function tabCheck() {
   var d = A.data;
@@ -1606,12 +1642,15 @@ function tabCheck() {
     if (A.ckSet === 'ALL') return !!bySchool[st.school];
     return st.school === d.setById[A.ckSet].school;
   }).map(function (st) { return { st: st, set: A.ckSet === 'ALL' ? bySchool[st.school] : d.setById[A.ckSet] }; })
-    .sort(function (a, b) { return a.st.name.localeCompare(b.st.name); });
-  var am = attMatch(d); A.attIds = am.ids;
-  if (am.n) rows.sort(function (a, b) { return (am.ids[b.st.id] ? 1 : 0) - (am.ids[a.st.id] ? 1 : 0); });
+    ;
+  var am = attMatch(d); A.attIds = am.ids; A.attN = am.n;
+  rows.forEach(function (r) { r.g = ckGroup(r.set.id, r.st.id); r.name = r.st.name; });
+  rows.sort(ckCmp);
   var html = '<div class="toolbar ck-bar"><input id="in-ckq" class="ck-search" placeholder="이름 또는 초성 (예: ㄱㅈㅇ)" value="' + h(A.ckQ) + '" autocomplete="off">' +
-    '<select id="sel-ck" aria-label="세트"><option value="ALL"' + (A.ckSet === 'ALL' ? ' selected' : '') + '>받는 중인 세트 전체</option>' + setOptions(A.ckSet) + '</select></div>' +
-    '<p class="note">이름 첫 글자나 초성만 쳐도 찾아져요. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워져요. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있어요.</p>' + attBox(am);
+    '<select id="sel-ck" aria-label="세트"><option value="ALL"' + (A.ckSet === 'ALL' ? ' selected' : '') + '>받는 중인 세트 전체</option>' + setOptions(A.ckSet) + '</select>' +
+    '<span id="ck-left" class="ck-left"></span><button class="btn" id="ck-sort" data-act="ck-sort" hidden>체크한 학생 아래로 보내기</button></div>' +
+    '<p class="note">이름 첫 글자나 초성만 쳐도 찾아져요. 누르면 바로 저장되고, 같은 칸을 한 번 더 누르면 지워져요. 다음 학생은 검색창에서 Enter를 누르면 지우고 바로 칠 수 있어요.</p>' +
+    '<p class="note">아직 체크 안 한 학생이 위에 있어요. 체크해도 그 자리에 그대로 있다가, 검색창에서 Enter를 누르거나 "체크한 학생 아래로 보내기"를 누르면 아래로 내려가요.</p>' + attBox(am);
   if (!d.sets.length) return html + '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
   if (!rows.length) return html + '<p class="empty">받는 중인 세트가 있는 학생이 없어요.</p>';
   var shownSets = []; rows.forEach(function (r) { if (shownSets.indexOf(r.set) < 0) shownSets.push(r.set); });
@@ -1625,7 +1664,7 @@ function tabCheck() {
     shownSets.map(function (x) {
       return '<label for="evn-' + x.id + '">' + h(fullSchool(x.school) + ' ' + x.week) + '</label><input id="evn-' + x.id + '" data-evname="' + x.id + '" value="' + h(x.evalName || '') + '" placeholder="없으면 비워 두기">';
     }).join('') + '</div></details>';
-  html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r) { return ckRowHtml(r.st, r.set); }).join('') + '</div>';
+  html += '<p class="empty" id="ck-none" hidden>찾는 학생이 없어요.</p><div class="cklist" id="ck-list">' + rows.map(function (r, i) { return (i === 0 || rows[i - 1].g !== r.g ? ckDivHtml(r.g) : '') + ckRowHtml(r.st, r.set); }).join('') + '</div>';
   return html;
 }
 function extraOf(setId, sid) {
@@ -1637,7 +1676,7 @@ function ckRowHtml(st, set) {
   var r = { st: st, set: set };
     var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
     var isAtt = !!(A.attIds && A.attIds[st.id]);
-    return '<div class="ckrow' + (isAtt ? ' att' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
+    return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) === 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
       '<small class="' + (sv === 'err' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
       '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
@@ -1654,6 +1693,7 @@ function refreshCkRow(setId, sid) {
   if (!el || !st || !set) return;
   var hidden = el.hidden; el.outerHTML = ckRowHtml(st, set);
   var el2 = document.getElementById('ck-' + setId + '-' + sid); if (el2) el2.hidden = hidden;
+  ckMark();
 }
 var ckTimer = null;
 function queueCheckSave() {
@@ -2312,6 +2352,7 @@ function onClick(ev) {
     var cq3 = $('#in-ckq'); if (cq3 && !('ontouchstart' in window)) { cq3.focus(); cq3.select(); }
     return;
   }
+  if (act === 'ck-sort') { ckResort(); var lst = $('#ck-list'); if (lst && lst.getBoundingClientRect().top < 0) window.scrollTo(0, window.scrollY + lst.getBoundingClientRect().top - 80); return; }
   if (act === 'came-all') {
     (A.cameAll || []).forEach(function (p) {
       if (extraOf(p[0], p[1])) return;
@@ -2469,6 +2510,8 @@ function applyFilter() {
   if (ck) {
     var shown = 0;
     ck.querySelectorAll('[data-name]').forEach(function (r) { var ok = nameMatch(r.dataset.name, A.ckQ); r.hidden = !ok; if (ok) shown++; });
+    ck.querySelectorAll('.ck-div').forEach(function (x) { x.hidden = !!A.ckQ; });
+    ckMark();
     ck.classList.toggle('one', shown === 1);
     var none = $('#ck-none'); if (none) none.hidden = shown > 0;
   }
@@ -2581,7 +2624,7 @@ function boot() {
   document.addEventListener('submit', onSubmitSafe);
   document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape' && A.detail) { A.detail = null; render(); }
-    if (e.target && e.target.id === 'in-ckq' && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); A.ckQ = ''; e.target.value = ''; applyFilter(); }
+    if (e.target && e.target.id === 'in-ckq' && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); A.ckQ = ''; e.target.value = ''; ckResort(); }
   });
   var gotAtt = attReceive();
   window.addEventListener('hashchange', function () {
