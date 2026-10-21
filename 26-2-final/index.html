@@ -1679,6 +1679,12 @@ var FB_TYPE = {
 };
 function fbJosa(w, a, b) { var c = String(w).charCodeAt(String(w).length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; }
 function fbWork(w) { return '‘' + w + '’'; }
+// 세트 문항 대부분이 문학이면 '작품', 아니면(문법 등) '주제'
+function fbUnit(items) {
+  var c = {}; (items || []).forEach(function (it) { c[it.area || ''] = (c[it.area || ''] || 0) + 1; });
+  var top = Object.keys(c).sort(function (a, b) { return c[b] - c[a]; })[0];
+  return top === '문학' ? '작품' : '주제';
+}
 // 학부모 문자 호칭: 성을 빼고 받침 있으면 '이는', 없으면 '는' (예: 지호는, 서연이는)
 function fbWho(name) {
   name = String(name || '').trim();
@@ -1693,7 +1699,7 @@ function feedbackFor(set, sub, d) {
   // 고르지 않고 낸 문항은 점수에서는 틀림이지만, 아래 분석(작품·유형·선지 습관)에서는 뺀다
   var BL = blankNos(items, sub), nb = Object.keys(BL).length;
   var X = function (it) { return sub.marks[it.no] === 'X' && !BL[it.no]; };
-  var wrong = items.filter(X), rate = (n - wrong.length - nb) / n;
+  var wrong = items.filter(X), rate = (n - wrong.length - nb) / n, unit = fbUnit(items);
   var out = [];
   if (nb) out.push(who + ' 이번 주 확인 테스트에서 ' + nb + '문항을 끝까지 풀지 못하고 제출했습니다.');
 
@@ -1716,14 +1722,20 @@ function feedbackFor(set, sub, d) {
       var w2 = works[1] && works[1].b.x >= 2 && works[1].b.x / wrong.length >= 0.3 ? works[1] : null;
       out.push((nb ? '푼 문항 중에서는 ' : who + ' 이번 주 ') + fbWork(top.w) + (w2 ? fbJosa(top.w, '과', '와') + ' ' + fbWork(w2.w) : '') + ' 문항에서 오답이 집중되었습니다.');
     } else {
-      out.push(nb ? '푼 문항 중 오답은 한 작품에 몰리지 않고 여러 작품에 고르게 나타났습니다.' : who + ' 이번 주 오답이 한 작품에 몰리지 않고 여러 작품에 고르게 나타났습니다.');
+      var tops2 = works.filter(function (o) { return o.b.x >= 2; }).slice(0, 2);
+      if (unit === '주제' && tops2.length) {
+        // 문법은 주제 이름이 곧 개념이라, 고르게 틀렸어도 상대적으로 많이 틀린 주제를 짚어 줌
+        out.push((nb ? '푼 문항 중 오답은 ' : who + ' 이번 주 오답이 ') + '한 주제에 몰리지 않고 여러 주제에 나뉘어 있었고, 그중 ' +
+          fbWork(tops2[0].w) + (tops2[1] ? fbJosa(tops2[0].w, '과', '와') + ' ' + fbWork(tops2[1].w) : '') + ' 문항에서 상대적으로 많이 틀렸습니다.');
+      } else out.push(nb ? '푼 문항 중 오답은 한 ' + unit + '에 몰리지 않고 여러 ' + unit + '에 고르게 나타났습니다.' : who + ' 이번 주 오답이 한 ' + unit + '에 몰리지 않고 여러 ' + unit + '에 고르게 나타났습니다.');
     }
   }
 
   // 2. 약한 유형 (이번 세트 안에서 2문항 이상 틀리고 정답률이 낮은 유형)
   var byType = {};
   items.forEach(function (it) { if (BL[it.no]) return; (it.types || []).forEach(function (t) { var b = byType[t] || (byType[t] = { n: 0, x: 0 }); b.n++; if (X(it)) b.x++; }); });
-  var weakT = Object.keys(byType).filter(function (t) { var b = byType[t]; return b.x >= 2 && b.x / b.n >= 0.4 && FB_TYPE[t]; })
+  var answered = items.filter(function (it) { return !BL[it.no]; }).length;
+  var weakT = Object.keys(byType).filter(function (t) { var b = byType[t]; return b.x >= 2 && b.x / b.n >= 0.4 && FB_TYPE[t] && b.n < answered * 0.8; })
     .sort(function (a, b) { return byType[b].x / byType[b].n - byType[a].x / byType[a].n || byType[b].x - byType[a].x; }).slice(0, 2);
   if (weakT.length) {
     out.push(fbPick(seed, ['특히 ', '유형별로 보면 ']) + weakT.map(function (t) { return FB_TYPE[t] + ' 문항'; }).join('과 ') +
