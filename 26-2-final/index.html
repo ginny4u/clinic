@@ -286,7 +286,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 5;
+var CORE_VERSION = 6;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -428,7 +428,7 @@ function setStats(store, set, items, meId, fresh, subsList) {
     few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
 
-var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1, resetSub: 1 };
+var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1, resetSub: 1, editSub: 1 };
 
 var CORE_ACTIONS = {
   /* ---------- 학생 ---------- */
@@ -711,6 +711,31 @@ var CORE_ACTIONS = {
     if (!store.deleteSub) return fail('서버가 아직 예전 버전이라 초기화할 수 없어요.');
     store.deleteSub(req.setId, req.studentId);
     return { ok: true };
+  },
+
+  // 선생님이 학생이 고른 번호를 고침(낸 시각은 그대로, 점수는 다시 매김)
+  editSub: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var set = store.sets().filter(function (x) { return x.id === req.setId; })[0];
+    if (!set) return fail('세트를 찾을 수 없어요.');
+    var sub = store.subs().filter(function (s) { return s.setId === set.id && s.studentId === req.studentId; })[0];
+    if (!sub) return fail('고칠 제출 기록이 없어요. 새로고침해 보세요.');
+    var items = itemsMap(store)[set.id] || [];
+    if (!setIsOmr(items) || !hasPicks(sub)) return fail('무한선지로 낸 기록만 고칠 수 있어요.');
+    if (!req.picks || typeof req.picks !== 'object') return fail('고친 답이 비어 있어요.');
+    var essayX = cleanMarks(req.marks, items.length, ['X']), marks = {}, follow = {};
+    Object.keys(sub.follow || {}).forEach(function (k) { if (!/^p\d+$/.test(k)) follow[k] = sub.follow[k]; });
+    items.forEach(function (it) {
+      if (isOmr(it)) {
+        var p = cleanPicks(req.picks[it.no], Number(it.opts));
+        follow['p' + it.no] = p.join(',');
+        if (!samePicks(p, cleanPicks(it.ans, Number(it.opts)))) marks[it.no] = 'X';
+      } else if (essayX[it.no]) marks[it.no] = 'X';
+    });
+    var before = items.length - Object.keys(sub.marks || {}).filter(function (k) { return sub.marks[k] === 'X'; }).length;
+    sub.marks = marks; sub.follow = follow;
+    store.putSub(sub);
+    return { ok: true, before: before, score: items.length - Object.keys(marks).length, total: items.length };
   },
 
   saveChecks: function (req, store, env) {
@@ -1195,7 +1220,44 @@ function viewAdmin() {
   else html += tabSets();
   html += '</main>';
   if (A.detail) html += studentModal(A.detail);
+  if (A.subEdit) html += subEditModal();
   return html;
+}
+function editBtn(set, sid) {
+  var sb = A.data.subs.filter(function (x) { return x.setId === set.id && x.studentId === sid; })[0];
+  if (!sb || !hasPicks(sb) || !setIsOmr(A.data.items[set.id] || [])) return '';
+  return '<button class="mini" data-act="se-open" data-set="' + h(set.id) + '" data-st="' + h(sid) + '">답 고치기</button>';
+}
+function seWrong(it, e) {
+  return isOmr(it) ? !samePicks(cleanPicks(e.picks[it.no] || [], Number(it.opts)), cleanPicks(it.ans, Number(it.opts))) : e.marks[it.no] === 'X';
+}
+function subEditModal() {
+  var e = A.subEdit, d = A.data, set = d.setById[e.setId], st = d.stuById[e.studentId];
+  if (!set || !st) return '';
+  var items = d.items[set.id] || [];
+  var score = items.filter(function (it) { return !seWrong(it, e); }).length;
+  var rows = items.map(function (it, idx) {
+    var wrong = seWrong(it, e), body;
+    if (isOmr(it)) {
+      var p = e.picks[it.no] || [], ans = cleanPicks(it.ans, Number(it.opts)), btns = '';
+      for (var k = 1; k <= it.opts; k++) btns += '<button type="button" class="op' + (p.indexOf(k) >= 0 ? ' on' : '') + '" data-act="se-opt" data-no="' + it.no + '" data-k="' + k + '" aria-label="' + it.no + '번 ' + k + '번 선지">' + k + '</button>';
+      body = '<div class="opts">' + btns + '</div><small class="' + (wrong ? 'badtxt' : 'oktxt') + '">' + (wrong ? '✕ 틀림' : '○ 맞음') + ' · 정답 ' + ans.map(numc).join(' ') + (p.length ? '' : ' · 안 고름') + '</small>';
+    } else {
+      var x = e.marks[it.no] === 'X';
+      body = '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="se-ess" data-no="' + it.no + '">' + (x ? '틀림' : '맞음') + '</button></div><small class="muted">서술형</small>';
+    }
+    return omrGroupHead(items, idx) + '<div class="orow"><div class="orow-h"><b>' + it.no + '</b><small>' + h(it.work) + '</small></div><div class="stack" style="gap:4px">' + body + '</div></div>';
+  }).join('');
+  return '<div class="overlay se-ov" data-act="se-cancel"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + ' 답 고치기" data-stop="1">' +
+    '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school + ' · ' + set.week) + ' 답 고치기</small></h2><button class="link" data-act="se-cancel">닫기</button></div>' +
+    '<p class="note">학생이 고른 번호예요. 번호를 누르면 켜고 끌 수 있고, 저장하면 다시 채점돼요. 낸 날짜는 그대로예요.</p>' +
+    '<div class="omr">' + rows + '</div>' +
+    '<div class="actions"><strong class="num" style="margin-right:auto">' + score + ' / ' + items.length + ' 맞힘</strong><button class="btn" data-act="se-cancel">취소</button><button class="btn primary" data-act="se-save">저장</button></div></div></div>';
+}
+function seRender() {
+  var ov = document.querySelector('.se-ov'), y = ov ? ov.scrollTop : 0;
+  renderKeep();
+  ov = document.querySelector('.se-ov'); if (ov) ov.scrollTop = y;
 }
 function resetBtn(set, sid) {
   var on = A.confirm && A.confirm.op === 'reset-sub' && A.confirm.id === set.id + ':' + sid;
@@ -1298,7 +1360,7 @@ function tabWeek() {
     subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
-      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + scores.filter(function (v) { return v > n - x; }).length) + '등' : g) + '</td><td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + resetBtn(set, s.studentId) + '</td></tr>';
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + scores.filter(function (v) { return v > n - x; }).length) + '등' : g) + '</td><td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
     }).join('') + '</tbody></table></div></section>';
   return html;
 }
@@ -1381,7 +1443,7 @@ function studentModal(id) {
     var x = 0, g = 0, q = [];
     Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; else g++; });
     var nb = Object.keys(blankNos(d.items[set.id] || [], sub)).length;
-    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + resetBtn(set, id) + '</td></tr>';
+    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + editBtn(set, id) + resetBtn(set, id) + '</td></tr>';
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
@@ -1963,6 +2025,46 @@ function onClick(ev) {
     (A.dirty[t.dataset.set] || (A.dirty[t.dataset.set] = {}))[t.dataset.st] = 1;
     A.saving[k2] = ''; queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
     var cq2 = $('#in-ckq'); if (cq2 && !('ontouchstart' in window)) { cq2.focus(); cq2.select(); }
+    return;
+  }
+  if (act === 'se-cancel') {
+    if (ev.target.closest('[data-stop]') && !ev.target.closest('button[data-act="se-cancel"]')) return;   // 창 안을 누른 것
+    A.subEdit = null; return renderKeep();
+  }
+  if (act === 'se-open') {
+    var sb5 = A.data.subs.filter(function (x) { return x.setId === t.dataset.set && x.studentId === t.dataset.st; })[0];
+    if (!sb5) return toast('제출 기록을 찾지 못했어요. 새로고침해 주세요.', true);
+    var se = { setId: t.dataset.set, studentId: t.dataset.st, picks: {}, marks: {} };
+    (A.data.items[se.setId] || []).forEach(function (it) {
+      if (isOmr(it)) se.picks[it.no] = picksOf(sb5, it.no);
+      else if (sb5.marks && sb5.marks[it.no] === 'X') se.marks[it.no] = 'X';
+    });
+    A.subEdit = se; A.confirm = null; return renderKeep();
+  }
+  if (act === 'se-opt' && A.subEdit) {
+    var no5 = Number(t.dataset.no), k5 = Number(t.dataset.k), arr5 = (A.subEdit.picks[no5] || []).slice(), at5 = arr5.indexOf(k5);
+    if (at5 >= 0) arr5.splice(at5, 1); else arr5.push(k5);
+    A.subEdit.picks[no5] = arr5.sort(function (a, b) { return a - b; });
+    return seRender();
+  }
+  if (act === 'se-ess' && A.subEdit) {
+    var no6 = t.dataset.no; if (A.subEdit.marks[no6] === 'X') delete A.subEdit.marks[no6]; else A.subEdit.marks[no6] = 'X';
+    return seRender();
+  }
+  if (act === 'se-save' && A.subEdit) {
+    var se2 = A.subEdit, st2 = A.data.stuById[se2.studentId], set2 = A.data.setById[se2.setId];
+    if (A.subEdit.saving) return;
+    A.subEdit.saving = true;
+    api('editSub', { token: S.token, setId: se2.setId, studentId: se2.studentId, picks: se2.picks, marks: se2.marks }).then(function (r) {
+      if (A.subEdit) A.subEdit.saving = false;
+      if (!r.ok) {
+        var old2 = /알 수 없는 요청/.test(r.error || '');
+        return toast(old2 ? '서버가 아직 예전 버전이라 답을 고칠 수 없어요. 앱스 스크립트에 새 omr 파일을 올려 주세요.' : r.error, true);
+      }
+      var fk2 = se2.setId + '.' + se2.studentId; delete A.fbEdit[fk2]; store_set('fb.' + fk2, null);
+      toast((st2 ? st2.name + ' ' : '') + (set2 ? set2.week + ' ' : '') + '답을 고쳤어요. ' + r.before + '개 → ' + r.score + '개 맞힘 (' + r.total + '문항)');
+      A.subEdit = null; applyAdmin(r.all);
+    });
     return;
   }
   if (act === 'reset-sub') {
