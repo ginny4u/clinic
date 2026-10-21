@@ -1611,7 +1611,9 @@ function ckDivHtml(grp) {
   var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : '체크한 학생';
   return '<div class="ck-div" data-grp="' + grp + '">' + t + '</div>';
 }
-function ckCmp(a, b) { return a.g - b.g || a.name.localeCompare(b.name); }
+// 출석을 가져왔으면 출석·체크 전 → 체크함 → 출석 명단에 없는 학생, 아니면 체크 전 → 체크함
+function ckRank(g) { return A.attN ? [0, 2, 1][g] : g; }
+function ckCmp(a, b) { return ckRank(a.g) - ckRank(b.g) || a.name.localeCompare(b.name); }
 // 지금 화면 순서가 체크 상태와 어긋났는지 보고 '정리' 버튼·남은 인원을 갱신
 function ckMark() {
   var list = $('#ck-list'); if (!list) return;
