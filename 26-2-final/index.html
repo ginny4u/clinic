@@ -284,7 +284,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 4;
+var CORE_VERSION = 5;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -426,7 +426,7 @@ function setStats(store, set, items, meId, fresh, subsList) {
     few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
 
-var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1 };
+var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1, resetSub: 1 };
 
 var CORE_ACTIONS = {
   /* ---------- 학생 ---------- */
@@ -699,6 +699,16 @@ var CORE_ACTIONS = {
       });
     }
     return { ok: true, set: set, regraded: regraded, oldSubs: oldSubs };
+  },
+
+  // 학생이 잘못 낸 주를 지워서 다시 낼 수 있게 함(숙제 검사·학생 계정은 그대로)
+  resetSub: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var sub = store.subs().filter(function (s) { return s.setId === req.setId && s.studentId === req.studentId; })[0];
+    if (!sub) return fail('지울 제출 기록이 없어요. 새로고침해 보세요.');
+    if (!store.deleteSub) return fail('서버가 아직 예전 버전이라 초기화할 수 없어요.');
+    store.deleteSub(req.setId, req.studentId);
+    return { ok: true };
   },
 
   saveChecks: function (req, store, env) {
@@ -1185,6 +1195,10 @@ function viewAdmin() {
   if (A.detail) html += studentModal(A.detail);
   return html;
 }
+function resetBtn(set, sid) {
+  var on = A.confirm && A.confirm.op === 'reset-sub' && A.confirm.id === set.id + ':' + sid;
+  return '<button class="mini' + (on ? ' arm' : '') + '" data-act="reset-sub" data-set="' + h(set.id) + '" data-st="' + h(sid) + '" title="이 주 답을 지우고 학생이 다시 낼 수 있게 해요">' + (on ? '한 번 더 누르면 ' + h(set.week) + ' 답 지움' : '초기화') + '</button>';
+}
 function subsFor(setId) { return A.data.subs.filter(function (s) { return s.setId === setId; }); }
 // 숙제 검사 기록이 '온 학생'으로 치는지: 숙제 표시나 추가 평가(또는 '왔음')가 하나라도 있어야 함
 function ckCame(c) { return !!c && (Object.keys(c.grades || {}).length > 0 || !!c.extra); }
@@ -1278,11 +1292,11 @@ function tabWeek() {
   }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
 
   // 학생별
-  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + '<th>성취도</th><th>제출</th></tr></thead><tbody>' +
+  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">맞힌</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + '<th>성취도</th><th>제출</th><th></th></tr></thead><tbody>' +
     subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
-      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + scores.filter(function (v) { return v > n - x; }).length) + '등' : g) + '</td><td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td></tr>';
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (n - x) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + scores.filter(function (v) { return v > n - x; }).length) + '등' : g) + '</td><td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + resetBtn(set, s.studentId) + '</td></tr>';
     }).join('') + '</tbody></table></div></section>';
   return html;
 }
@@ -1359,17 +1373,17 @@ function studentModal(id) {
   var hist = d.sets.filter(function (s) { return s.school === st.school; }).map(function (set) {
     var sub = d.subs.filter(function (x) { return x.setId === set.id && x.studentId === id; })[0];
     var n = (d.items[set.id] || []).length;
-    if (!n) { var ck0 = (d.checks || []).filter(function (c) { return c.setId === set.id && c.studentId === id; })[0]; return '<tr><td>' + h(set.week) + '</td><td colspan="3" class="muted">입력 없는 주' + (ckCame(ck0) ? ' · 왔음' : '') + '</td></tr>'; }
-    if (!sub && String(st.joinedAt) > setCutoff(set, d.subs.filter(function (x) { return x.setId === set.id; }))) return '<tr><td>' + h(set.week) + '</td><td colspan="3" class="muted">합류 전</td></tr>';
-    if (!sub) return '<tr><td>' + h(set.week) + '</td><td colspan="3" class="badtxt">미제출</td></tr>';
+    if (!n) { var ck0 = (d.checks || []).filter(function (c) { return c.setId === set.id && c.studentId === id; })[0]; return '<tr><td>' + h(set.week) + '</td><td colspan="4" class="muted">입력 없는 주' + (ckCame(ck0) ? ' · 왔음' : '') + '</td></tr>'; }
+    if (!sub && String(st.joinedAt) > setCutoff(set, d.subs.filter(function (x) { return x.setId === set.id; }))) return '<tr><td>' + h(set.week) + '</td><td colspan="4" class="muted">합류 전</td></tr>';
+    if (!sub) return '<tr><td>' + h(set.week) + '</td><td colspan="4" class="badtxt">미제출</td></tr>';
     var x = 0, g = 0, q = [];
     Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; else g++; });
     var nb = Object.keys(blankNos(d.items[set.id] || [], sub)).length;
-    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td></tr>';
+    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (n - x) + '/' + n + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + resetBtn(set, id) + '</td></tr>';
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
-    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>성취도</th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>성취도</th><th></th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
     (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
       '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
     '</div></div>';
@@ -1947,6 +1961,21 @@ function onClick(ev) {
     (A.dirty[t.dataset.set] || (A.dirty[t.dataset.set] = {}))[t.dataset.st] = 1;
     A.saving[k2] = ''; queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
     var cq2 = $('#in-ckq'); if (cq2 && !('ontouchstart' in window)) { cq2.focus(); cq2.select(); }
+    return;
+  }
+  if (act === 'reset-sub') {
+    var rk1 = t.dataset.set + ':' + t.dataset.st, rset = A.data.setById[t.dataset.set], rst = A.data.stuById[t.dataset.st];
+    if (!(A.confirm && A.confirm.op === 'reset-sub' && A.confirm.id === rk1)) { A.confirm = { id: rk1, op: 'reset-sub' }; return renderKeep(); }
+    A.confirm = null;
+    api('resetSub', { token: S.token, setId: t.dataset.set, studentId: t.dataset.st }).then(function (r) {
+      if (!r.ok) {
+        var old = /알 수 없는 요청|예전 버전/.test(r.error || '');
+        return toast(old ? '서버가 아직 예전 버전이라 초기화할 수 없어요. 앱스 스크립트에 새 omr 파일을 올려 주세요. 그전에는 구글 시트 subs 탭에서 그 학생 줄을 지우면 돼요.' : r.error, true);
+      }
+      var fk = t.dataset.set + '.' + t.dataset.st; delete A.fbEdit[fk]; store_set('fb.' + fk, null);
+      toast((rst ? rst.name + ' ' : '') + (rset ? rset.week + ' ' : '') + '답을 지웠어요. 학생이 새로고침하면 다시 낼 수 있어요.');
+      applyAdmin(r.all);
+    });
     return;
   }
   if (act === 'came') {
