@@ -1471,7 +1471,7 @@ function tabWeek() {
 
   // 학생별
   var evCol = !!set.evalName || subs.some(function (s) { return !!gradeOnly(extraOf(set.id, s.studentId)); });
-  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">' + (partial ? '정답률' : '맞힌') + '</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + (evCol ? '<th>' + h(set.evalName || '추가 평가') + '</th>' : '') + '<th>제출</th><th></th></tr></thead><tbody>' +
+  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">' + (partial ? '정답률' : '맞힌') + '</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + (evCol ? '<th>' + h(set.evalName || '추가 평가') + '</th>' : '') + '<th>제출일자</th><th></th></tr></thead><tbody>' +
     subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
