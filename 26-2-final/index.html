@@ -285,8 +285,13 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 :root { --pg: #b9e4c6; --po: #fcd9a0; --pr: #f7b5ab; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --pg: #93cfa8; --po: #e9c385; --pr: #e9a094; } }
 :root[data-theme="dark"] { --pg: #93cfa8; --po: #e9c385; --pr: #e9a094; }
-.term-t { border-collapse: separate; border-spacing: 0; width: auto; }
-.term-t th, .term-t td { padding: 3px 5px; text-align: center; border-bottom: 0; }
+.term-t { border-collapse: separate; border-spacing: 0; }
+.term-t { width: 100%; min-width: 760px; }
+.term-t th, .term-t td { padding: 4px 6px; text-align: center; border-bottom: 0; }
+.term-t th.wk, .term-t td.c { min-width: 56px; }
+.term-t .ms { border-left: 1px solid var(--line); }
+.term-t .tn { width: 7.5em; }
+.term-t .tl { width: 4.5em; }
 .term-t thead th { border-bottom: 1px solid var(--line-strong); }
 .term-t .tn { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; min-width: 5.5em; border-right: 1px solid var(--line); white-space: nowrap; }
 .term-t td.tn { vertical-align: middle; border-bottom: 1px solid var(--line); }
@@ -294,7 +299,7 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .term-t tr.tlast td { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
 .term-t tr.trow:not(.tlast) td:not(.tn) { padding-bottom: 1px; }
 .term-t tr.tgrp td { background: var(--paper); font-weight: 700; font-size: 0.85rem; padding: 6px 8px; border-bottom: 1px solid var(--line); }
-.sq { display: inline-block; width: 26px; height: 20px; border-radius: 4px; vertical-align: middle; font-family: var(--f-num); font-size: 0.68rem; font-weight: 700; line-height: 20px; text-align: center; color: #2a2d33; font-style: normal; }
+.sq { display: inline-block; width: 44px; height: 22px; border-radius: 5px; vertical-align: middle; font-family: var(--f-num); font-size: 0.74rem; font-weight: 700; line-height: 22px; text-align: center; color: #2a2d33; font-style: normal; }
 .sq.g { background: var(--pg); } .sq.o { background: var(--po); } .sq.r { background: var(--pr); }
 .sq.n { border: 1.5px dashed var(--line-strong); opacity: 0.45; }
 .sq.x, .sq.none { color: var(--muted); font-weight: 400; }
@@ -304,7 +309,7 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .tlegend td { padding: 2px 14px 2px 0; }
 .tlegend .sq { width: 18px; height: 14px; line-height: 14px; margin-right: 6px; }
 .toolbar input.tq { width: 160px; flex: 0 0 auto; }
-.tscroll.tfit { width: fit-content; max-width: 100%; }
+@media (max-width: 520px) { .term-t .sq { width: 34px; } .term-t th.wk, .term-t td.c { min-width: 44px; } .term-t { min-width: 0; } }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
@@ -1562,8 +1567,8 @@ function tabTerm() {
     '<tr><th></th><td><i class="sq n"></i>아직(받는 중인 주) · 등록 전</td><td><i class="sq x">–</i>해당 없음</td><td><i class="sq none">·</i>그 주 세트 없음</td></tr></table>' +
     '<p class="note">칸에 마우스를 올리면 자세한 내용이 보여요. 성취도 칸 숫자는 정답률(%)이고, 색은 그 주 같은 세트를 낸 학생들 안에서의 순위로 정해요(정답률 90% 이상은 빨강으로 안 칠해요). 낸 학생이 5명 미만인 주는 정답률 80% · 60%(무한선지 70% · 50%) 기준이에요. 지난 주차인데 기록이 없으면 빨강이에요.</p>';
   if (!studs.length) return html + '<p class="empty">학생이 없어요.</p>';
-  var head = '<tr><th class="tn" rowspan="2">이름</th><th rowspan="2"></th>' + months.map(function (o) { return '<th class="c" colspan="' + o.n + '">' + o.m + '월</th>'; }).join('') + '</tr>' +
-    '<tr>' + cols.map(function (k) { return '<th class="c">' + (k % 10) + '주</th>'; }).join('') + '</tr>';
+  var head = '<tr><th class="tn" rowspan="2">이름</th><th rowspan="2"></th>' + months.map(function (o, i) { return '<th class="c' + (i ? ' ms' : '') + '" colspan="' + o.n + '">' + o.m + '월</th>'; }).join('') + '</tr>' +
+    '<tr>' + cols.map(function (k, i) { return '<th class="c wk' + (i && Math.floor(cols[i - 1] / 10) !== Math.floor(k / 10) ? ' ms' : '') + '">' + (k % 10) + '주</th>'; }).join('') + '</tr>';
   var body = '', lastSc = null;
   studs.forEach(function (st) {
     if (st.school !== lastSc) { lastSc = st.school; body += '<tr class="tgrp"><td class="tn" colspan="' + (cols.length + 2) + '">' + h(fullSchool(st.school)) + ' <small class="muted">' + studs.filter(function (x) { return x.school === st.school; }).length + '명</small></td></tr>'; }
@@ -1578,11 +1583,11 @@ function tabTerm() {
         (j === 0 ? '<td class="tn" rowspan="' + lines.length + '"><button class="link" data-act="detail" data-id="' + st.id + '">' + h(st.name) + '</button></td>' : '') +
         '<td class="tl">' + ln[0] + '</td>' + cells.map(function (c, ci) {
           var wk = (Math.floor(cols[ci] / 10)) + '.' + (cols[ci] % 10) + '주';
-          return '<td class="c">' + (c ? termSq(c[ln[1]], wk) : '<span class="sq none" title="' + h(wk + ' · 세트 없음') + '">·</span>') + '</td>';
+          return '<td class="c' + (ci && Math.floor(cols[ci - 1] / 10) !== Math.floor(cols[ci] / 10) ? ' ms' : '') + '">' + (c ? termSq(c[ln[1]], wk) : '<span class="sq none" title="' + h(wk + ' · 세트 없음') + '">·</span>') + '</td>';
         }).join('') + '</tr>';
     });
   });
-  html += '<div class="tscroll tfit"><table class="t term-t" id="term-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+  html += '<div class="tscroll"><table class="t term-t" id="term-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
     '<p class="empty" id="term-none" hidden>찾는 학생이 없어요.</p>';
   setTimeout(termFilter, 0);
   return html;
