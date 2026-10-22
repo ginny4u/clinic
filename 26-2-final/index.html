@@ -960,6 +960,7 @@ function creditFromDetail(detail) {
   return o;
 }
 function $(sel) { return document.querySelector(sel); }
+function fmtDateKo(iso) { if (!iso) return ''; var d = new Date(iso); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
 function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
 
 var S = { role: store_get('role'), token: store_get('token'), me: null, view: 'login' };
@@ -1496,7 +1497,7 @@ function tabWeek() {
     subs.slice().sort(function (a, b) { return subCredit(items, b) - subCredit(items, a) || ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
-      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (partial ? pct(n ? subCredit(items, s) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x)) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + crs.filter(function (v) { return v > subCredit(items, s) + 1e-9; }).length) + '등' : g) + '</td>' + (evCol ? '<td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td>' : '') + '<td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (partial ? pct(n ? subCredit(items, s) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x) + '/' + n) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + crs.filter(function (v) { return v > subCredit(items, s) + 1e-9; }).length) + '등' : g) + '</td>' + (evCol ? '<td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td>' : '') + '<td class="muted">' + fmtDateKo(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
     }).join('') + '</tbody></table></div></section>';
   return html;
 }
