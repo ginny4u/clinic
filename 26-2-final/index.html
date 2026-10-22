@@ -1470,11 +1470,12 @@ function tabWeek() {
   }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
 
   // 학생별
-  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">' + (partial ? '정답률' : '맞힌') + '</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + '<th>성취도</th><th>제출</th><th></th></tr></thead><tbody>' +
+  var evCol = !!set.evalName || subs.some(function (s) { return !!gradeOnly(extraOf(set.id, s.studentId)); });
+  html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">' + (partial ? '정답률' : '맞힌') + '</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + (evCol ? '<th>' + h(set.evalName || '추가 평가') + '</th>' : '') + '<th>제출</th><th></th></tr></thead><tbody>' +
     subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
-      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (partial ? pct(n ? subCredit(items, s) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x)) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + crs.filter(function (v) { return v > subCredit(items, s) + 1e-9; }).length) + '등' : g) + '</td><td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td><td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
+      return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (partial ? pct(n ? subCredit(items, s) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x)) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + crs.filter(function (v) { return v > subCredit(items, s) + 1e-9; }).length) + '등' : g) + '</td>' + (evCol ? '<td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td>' : '') + '<td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
     }).join('') + '</tbody></table></div></section>';
   return html;
 }
@@ -1673,7 +1674,7 @@ function studentModal(id) {
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
-    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>성취도</th><th></th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
+    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th></th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
     (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
       '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
     '</div></div>';
