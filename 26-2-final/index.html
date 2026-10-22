@@ -1386,7 +1386,10 @@ function expectedFor(set) {
   return A.data.students.filter(function (s) { return s.status === 'active' && s.school === set.school && String(s.joinedAt) <= cut; });
 }
 function setOptions(sel) {
-  return A.data.sets.map(function (s) { return '<option value="' + h(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + h(s.school + ' · ' + s.week + (s.open ? '' : ' (마감)')) + '</option>'; }).join('');
+  var by = {}; A.data.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
+  return Object.keys(by).sort(function (a, b) { return a.localeCompare(b, 'ko'); }).map(function (sc) {
+    return '<optgroup label="' + h(fullSchool(sc)) + '">' + by[sc].map(function (s) { return '<option value="' + h(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + h(s.school + ' · ' + s.week + (s.open ? '' : ' (마감)')) + '</option>'; }).join('') + '</optgroup>';
+  }).join('');
 }
 
 function tabWeek() {
@@ -1472,7 +1475,7 @@ function tabWeek() {
   // 학생별
   var evCol = !!set.evalName || subs.some(function (s) { return !!gradeOnly(extraOf(set.id, s.studentId)); });
   html += '<section class="block"><h2>학생별</h2><div class="tscroll"><table class="t"><thead><tr><th>이름</th><th class="r">' + (partial ? '정답률' : '맞힌') + '</th>' + (anyBlank ? '<th class="r">안 푼</th>' : '') + (anyOmr ? '<th class="r">등수</th>' : '<th class="r">찍맞</th>') + (evCol ? '<th>' + h(set.evalName || '추가 평가') + '</th>' : '') + '<th>제출일자</th><th></th></tr></thead><tbody>' +
-    subs.slice().sort(function (a, b) { return ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
+    subs.slice().sort(function (a, b) { return subCredit(items, b) - subCredit(items, a) || ((d.stuById[a.studentId] || {}).name || '').localeCompare((d.stuById[b.studentId] || {}).name || ''); }).map(function (s) {
       var st = d.stuById[s.studentId] || { name: '(삭제됨)' }, x = 0, g = 0, q = 0;
       Object.keys(s.marks).forEach(function (k) { if (s.marks[k] === 'X') x++; else g++; });
       return '<tr><td><button class="link" data-act="detail" data-id="' + s.studentId + '">' + h(st.name) + '</button></td><td class="r num">' + (partial ? pct(n ? subCredit(items, s) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x)) + '</td>' + (anyBlank ? '<td class="r num muted">' + (Object.keys(blankNos(items, s)).length || '') + '</td>' : '') + '<td class="r num">' + (anyOmr ? (1 + crs.filter(function (v) { return v > subCredit(items, s) + 1e-9; }).length) + '등' : g) + '</td>' + (evCol ? '<td>' + h(gradeOnly(extraOf(set.id, s.studentId))) + '</td>' : '') + '<td class="muted num">' + fmtDate(s.submittedAt) + '</td><td class="acts">' + editBtn(set, s.studentId) + resetBtn(set, s.studentId) + '</td></tr>';
@@ -1789,7 +1792,7 @@ function ckGroup(setId, sid) {
 }
 function ckDivHtml(grp) {
   var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생' : grp === 4 ? '오늘 또 온 학생 (이번 주 체크는 끝남)' : '전에 체크한 학생';
-  return '<div class="ck-div" data-grp="' + grp + '">' + t + '</div>';
+  return '<div class="ck-div" data-grp="' + grp + '"><span>' + t + '</span> <span class="ck-cnt"></span></div>';
 }
 // 출석을 가져왔으면 출석·체크 전 → 또 온 학생 → 오늘 체크 → 출석 명단에 없는 학생 → 전에 체크, 아니면 체크 전 → 오늘 체크 → 전에 체크
 function ckRank(g) { return A.attN ? [0, 3, 2, 4, 1][g] : g; }
@@ -1801,6 +1804,9 @@ function ckMark() {
   var info = rows.map(function (el) { var g = ckGroup(el.dataset.set, el.dataset.st); el.classList.toggle('done', g >= 2); if (g < 2) left++; return { el: el, g: g, name: el.dataset.name }; });
   var sorted = info.slice().sort(ckCmp), off = sorted.some(function (o, i) { return o.el !== info[i].el; });
   var btn = $('#ck-sort'); if (btn) btn.hidden = !off;
+  // 묶음 제목 옆 인원: 지금 상태 기준(줄을 아직 정리하지 않았어도 맞는 숫자)
+  var cnt2 = {}; info.forEach(function (o) { cnt2[o.g] = (cnt2[o.g] || 0) + 1; });
+  [].slice.call(list.querySelectorAll('.ck-div')).forEach(function (dv) { var c = dv.querySelector('.ck-cnt'); if (c) c.textContent = '(' + (cnt2[dv.dataset.grp] || 0) + '명)'; });
   var cnt = $('#ck-left'); if (cnt) cnt.textContent = left ? '체크 전 ' + left + '명' : '모두 체크했어요';
 }
 // 체크한 학생을 아래로(행을 다시 그리지 않고 순서만 바꿔서 검색창 입력이 끊기지 않게)
