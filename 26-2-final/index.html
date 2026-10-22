@@ -1398,20 +1398,21 @@ function setOptions(sel) {
 
 // 학교 버튼을 나란히, 고른 학교의 주차를 버튼으로(왼쪽부터 오래된 주 → 최근 주)
 function setPicker(set) {
-  var d = A.data, by = {};
+  var d = A.data, by = {}, school = set ? set.school : A.wkSchool;
   d.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
   var schools = Object.keys(by).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
-  var mine = (by[set.school] || []).slice().sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+  var mine = (by[school] || []).slice().sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
   return '<div class="setpick"><div class="toolbar"><span class="spl">학교</span><div class="chips">' + schools.map(function (sc) {
-      return '<button class="chip' + (sc === set.school ? ' on' : '') + '" data-act="wk-school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
+      return '<button class="chip' + (sc === school ? ' on' : '') + '" data-act="wk-school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>' +
-    '<div class="toolbar"><span class="spl">주차</span><div class="chips">' + mine.map(function (s) {
-      return '<button class="chip' + (s.id === set.id ? ' on' : '') + '" data-act="wk-set" data-id="' + h(s.id) + '">' + h(s.week) + (s.open ? '' : ' <small>마감</small>') + '</button>';
-    }).join('') + '</div></div></div>';
+    (school ? '<div class="toolbar"><span class="spl">주차</span><div class="chips">' + mine.map(function (s) {
+      return '<button class="chip' + (set && s.id === set.id ? ' on' : '') + '" data-act="wk-set" data-id="' + h(s.id) + '">' + h(s.week) + (s.open ? '' : ' <small>마감</small>') + '</button>';
+    }).join('') + '</div></div>' : '') + '</div>';
 }
 function tabWeek() {
-  var d = A.data, set = d.setById[A.setId];
-  if (!set) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  var d = A.data, set = d.setById[A.wkSet];
+  if (!d.sets.length) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
+  if (!set) return setPicker(null) + '<p class="empty">' + (A.wkSchool ? '주차를 골라 주세요.' : '학교와 주차를 골라 주세요.') + '</p>';
   var items = d.items[set.id] || [], subs = subsFor(set.id), exp = expectedFor(set);
   if (!items.length) {
     var came0 = {}; (d.checks || []).forEach(function (c) { if (c.setId === set.id && ckCame(c)) came0[c.studentId] = 1; });
@@ -2516,14 +2517,11 @@ function onClick(ev) {
     if (act === 'mark') { var no = t.dataset.no, m = F.marks[no]; if (!m) F.marks[no] = 'X'; else if (m === 'X') F.marks[no] = 'G'; else { delete F.marks[no]; delete F.follow[no]; } return renderKeep(); }
   }
   // 선생님
-  if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
+  if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; if (A.tab === 'week') { A.wkSet = null; A.wkSchool = null; } return render(); }
   if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔어요.'); }); return; }
   if (act === 'school') { A.school = t.dataset.v; return render(); }
-  if (act === 'wk-school' || act === 'wk-set') {
-    var pick = act === 'wk-set' ? A.data.setById[id] : A.data.sets.filter(function (s) { return s.school === t.dataset.v; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); })[0];
-    if (pick) { A.setId = pick.id; A.showAllItems = false; A.showAllQ = false; }
-    return render();
-  }
+  if (act === 'wk-school') { A.wkSchool = t.dataset.v; A.wkSet = null; return render(); }
+  if (act === 'wk-set') { var pick = A.data.setById[id]; if (pick) { A.wkSet = pick.id; A.wkSchool = pick.school; A.showAllItems = false; A.showAllQ = false; } return render(); }
   if (act === 'ach') {
     var k2 = t.dataset.set + ':' + t.dataset.st;
     A.extras[k2] = extraOf(t.dataset.set, t.dataset.st) === t.dataset.v ? '' : t.dataset.v;
