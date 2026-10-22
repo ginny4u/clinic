@@ -281,6 +281,7 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .fbgrp > span { font-size: 0.72rem; color: var(--muted); padding-top: 3px; white-space: nowrap; }
 .fbchips { gap: 4px; }
 .fbchips .chip { font-size: 0.74rem; padding: 2px 8px; }
+.relog { max-width: 360px; margin: 10vh auto 0; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
@@ -870,7 +871,34 @@ var pending = 0;
 function busy(d) { pending += d; var b = document.getElementById('busy'); if (b) b.hidden = pending <= 0; }
 function api(action, payload) {
   busy(1);
-  return apiRaw(action, payload).then(function (r) { busy(-1); return r; });
+  return apiRaw(action, payload).then(function (r) { busy(-1); if (action !== 'adminLogin' && isAuthErr(r)) needRelogin(); return r; });
+}
+function isAuthErr(r) { return !!r && !r.ok && /선생님 로그인이 필요/.test(r.error || ''); }
+// 화면 전체를 다시 그리지 않는 창(그동안 누른 칸·쓰던 문장이 그대로 남게)
+function needRelogin() {
+  if (A.relogin || S.role !== 'admin' || !A.data) return;
+  A.relogin = true;
+  var box = document.createElement('div'); box.className = 'overlay'; box.id = 'relog';
+  box.innerHTML = '<form class="sheet stack relog" id="f-relog" novalidate><h2>다시 로그인해 주세요</h2>' +
+    '<p class="note">로그인한 지 6시간이 지나 저장이 잠시 멈췄어요. 비밀번호를 다시 넣으면 그동안 누른 칸이 바로 저장돼요.</p>' +
+    '<input id="in-relog" type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="current-password" aria-label="선생님 비밀번호">' +
+    '<p class="err" id="relog-err" hidden></p><button class="btn primary" type="submit">다시 로그인</button></form>';
+  document.body.appendChild(box);
+  var inp = document.getElementById('in-relog'); if (inp) inp.focus();
+}
+function relogin(f) {
+  var pw = (document.getElementById('in-relog') || {}).value || '';
+  api('adminLogin', { pw: pw }).then(function (r) {
+    delete f.dataset.busy;
+    var sb = f.querySelector('button[type="submit"]'); if (sb) { sb.disabled = false; sb.textContent = sb.dataset.label || '다시 로그인'; }
+    var er = document.getElementById('relog-err');
+    if (!r.ok) { if (er) { er.textContent = r.error; er.hidden = false; } return; }
+    S.token = r.token; store_set('token', r.token); A.relogin = false;
+    var box = document.getElementById('relog'); if (box) box.remove();
+    toast('다시 로그인했어요. 누른 칸을 저장할게요.');
+    Object.keys(A.noteRetry || {}).forEach(function (sid) { queueNoteSave(sid); }); A.noteRetry = {};
+    flushChecks(); A.syncAt = 0; setTimeout(syncAdmin, 1500);
+  });
 }
 function apiRaw(action, payload) {
   var req = Object.assign({ action: action }, payload || {});
@@ -1687,7 +1715,7 @@ function ckRowHtml(st, set) {
     var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
     var isAtt = !!(A.attIds && A.attIds[st.id]);
     return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
-      '<small class="' + (sv === 'err' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
+      '<small class="' + (sv === 'err' || sv === 'wait' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'wait' ? '다시 로그인하면 저장돼요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
       '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
@@ -1711,6 +1739,7 @@ function queueCheckSave() {
   ckTimer = setTimeout(flushChecks, 900);
 }
 function flushChecks() {
+  if (A.relogin) return;
   Object.keys(A.dirty).forEach(function (setId) {
     var ids = Object.keys(A.dirty[setId]); if (!ids.length) return;
     A.dirty[setId] = {};
@@ -1718,6 +1747,10 @@ function flushChecks() {
     ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; refreshCkRow(setId, id); });
     var sent = {}; ids.forEach(function (id) { sent[id] = extraOf(setId, id); });
     api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {}, extra: sent[id] }; }) }).then(function (r) {
+      if (isAuthErr(r)) {
+        ids.forEach(function (id) { (A.dirty[setId] || (A.dirty[setId] = {}))[id] = 1; A.saving[setId + ':' + id] = 'wait'; refreshCkRow(setId, id); });
+        return;
+      }
       ids.forEach(function (id) { A.saving[setId + ':' + id] = r.ok ? 'ok' : 'err'; });
       if (r.ok && r.saved.some(function (c) { return sent[c.studentId] && c.extra !== sent[c.studentId]; }))
         toast('서버(앱스 스크립트)가 예전 버전이라 \'왔음\'과 추가 평가가 저장되지 않았어요. 새 omr 파일(v12)을 올리고 새 버전으로 배포해 주세요.', true);
@@ -1765,7 +1798,9 @@ function queueNoteSave(setId) {
   noteTimer[setId] = setTimeout(function () {
     var set = A.data.setById[setId]; if (!set) return;
     var st = $('#note-st-' + setId); if (st) st.textContent = '저장 중…';
+    if (A.relogin) { (A.noteRetry || (A.noteRetry = {}))[setId] = 1; return; }
     api('saveNote', { token: S.token, setId: setId, note: set.note || '', evalName: set.evalName || '' }).then(function (r) {
+      if (isAuthErr(r)) { (A.noteRetry || (A.noteRetry = {}))[setId] = 1; var st3 = $('#note-st-' + setId); if (st3) { st3.textContent = '다시 로그인하면 저장돼요'; st3.className = 'badtxt'; } return; }
       var st2 = $('#note-st-' + setId); if (st2) { st2.textContent = r.ok ? '저장됨' : '저장 실패'; st2.className = r.ok ? 'oktxt' : 'badtxt'; }
     });
   }, 900);
@@ -2384,7 +2419,7 @@ function onClick(ev) {
     var k3 = t.dataset.set + ':' + t.dataset.st;
     A.extras[k3] = extraOf(t.dataset.set, t.dataset.st) ? '' : '출석';
     (A.dirty[t.dataset.set] || (A.dirty[t.dataset.set] = {}))[t.dataset.st] = 1;
-    A.saving[k3] = ''; queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
+    A.saving[k3] = ''; (A.touchAt || (A.touchAt = {}))[k3] = Date.now(); queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
     var cq3 = $('#in-ckq'); if (cq3 && !('ontouchstart' in window)) { cq3.focus(); cq3.select(); }
     return;
   }
@@ -2392,7 +2427,7 @@ function onClick(ev) {
   if (act === 'came-all') {
     (A.cameAll || []).forEach(function (p) {
       if (extraOf(p[0], p[1])) return;
-      A.extras[p[0] + ':' + p[1]] = '출석'; (A.dirty[p[0]] || (A.dirty[p[0]] = {}))[p[1]] = 1; A.saving[p[0] + ':' + p[1]] = '';
+      A.extras[p[0] + ':' + p[1]] = '출석'; (A.dirty[p[0]] || (A.dirty[p[0]] = {}))[p[1]] = 1; A.saving[p[0] + ':' + p[1]] = ''; (A.touchAt || (A.touchAt = {}))[p[0] + ':' + p[1]] = Date.now();
     });
     queueCheckSave(); return renderKeep();
   }
@@ -2401,7 +2436,7 @@ function onClick(ev) {
     if (act === 'grade-allA') A.data.setById[setId].homework.forEach(function (hw) { row[hw] = 'A'; });
     else { var hw = t.dataset.hw; if (row[hw] === t.dataset.v) delete row[hw]; else row[hw] = t.dataset.v; }
     (A.dirty[setId] || (A.dirty[setId] = {}))[sid] = 1;
-    A.saving[setId + ':' + sid] = '';
+    A.saving[setId + ':' + sid] = ''; (A.touchAt || (A.touchAt = {}))[setId + ':' + sid] = Date.now();
     queueCheckSave(); refreshCkRow(setId, sid);
     var cq = $('#in-ckq'); if (cq && !('ontouchstart' in window)) { cq.focus(); cq.select(); }
     return;
@@ -2518,6 +2553,32 @@ function onClick(ev) {
   }
 }
 function keepMsg() { var m = $('#in-msg'); if (m && F) F.message = m.value; }
+function syncAdmin() {
+  if (S.role !== 'admin' || S.view !== 'admin' || !A.data || A.relogin || A.syncing) return;
+  if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+  var started = Date.now(); A.syncing = true;
+  apiRaw('adminAll', { token: S.token }).then(function (r) {
+    A.syncing = false; A.syncAt = Date.now();
+    if (isAuthErr(r)) { needRelogin(); return; }
+    if (!r.ok || !A.data) return;
+    var d = A.data, changed = [], mine = {};
+    d.checks.forEach(function (c, i) { mine[c.setId + ':' + c.studentId] = i; });
+    (r.checks || []).forEach(function (c) {
+      var k = c.setId + ':' + c.studentId, i = mine[k], old = i === undefined ? null : d.checks[i];
+      if (old && String(c.checkedAt) <= String(old.checkedAt)) return;            // 이미 같은 것(또는 더 새것)을 갖고 있음
+      if ((A.touchAt && A.touchAt[k] >= started) || (A.dirty[c.setId] && A.dirty[c.setId][c.studentId]) || A.saving[k] === 'saving' || A.saving[k] === 'wait') return; // 이 기기에서 방금 누른 것은 그대로
+      if (old) d.checks[i] = c; else d.checks.push(c);
+      if (A.grades[c.setId]) A.grades[c.setId][c.studentId] = Object.assign({}, c.grades);
+      delete A.extras[k];
+      changed.push(c);
+    });
+    var subsChanged = JSON.stringify((r.subs || []).map(function (s) { return [s.setId, s.studentId, s.submittedAt]; })) !== JSON.stringify(d.subs.map(function (s) { return [s.setId, s.studentId, s.submittedAt]; }));
+    if (subsChanged) d.subs = r.subs || [];
+    if (!changed.length && !subsChanged) return;
+    if (A.tab === 'check') changed.forEach(function (c) { refreshCkRow(c.setId, c.studentId); });
+    else if (A.tab === 'today') toast('다른 기기·학생에게서 새 결과가 들어왔어요. "오늘 결과" 탭을 다시 누르면 보여요.');
+  });
+}
 function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y); }
 
 function onChange(ev) {
@@ -2611,6 +2672,7 @@ function onSubmit(ev) {
     });
   }
   else if (f.id === 'f-admin') adminLogin($('#in-apw').value);
+  else if (f.id === 'f-relog') relogin(f);
   else if (f.id === 'f-sub') {
     keepMsg();
     F.err = '';
@@ -2662,6 +2724,8 @@ function boot() {
     if (e.key === 'Escape' && A.detail) { A.detail = null; render(); }
     if (e.target && e.target.id === 'in-ckq' && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); A.ckQ = ''; e.target.value = ''; ckResort(); }
   });
+  setInterval(syncAdmin, 60000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && Date.now() - (A.syncAt || 0) > 20000) syncAdmin(); });
   var gotAtt = attReceive();
   window.addEventListener('hashchange', function () {
     if (!attReceive()) return;
