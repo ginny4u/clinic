@@ -312,6 +312,10 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .tlegend .sq { width: 18px; height: 14px; line-height: 14px; margin-right: 6px; }
 .toolbar input.tq { width: 160px; flex: 0 0 auto; }
 @media (max-width: 520px) { .term-t .sq { width: 34px; } .term-t th.wk, .term-t td.c { min-width: 44px; } .term-t { min-width: 0; } }
+.setpick { display: flex; flex-direction: column; gap: 6px; }
+.setpick .spl { font-size: 0.85rem; color: var(--muted); min-width: 2.4em; }
+.setpick .chip { padding: 5px 14px; font-size: 0.9rem; }
+.setpick .chip small { opacity: 0.7; margin-left: 2px; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
@@ -1392,6 +1396,19 @@ function setOptions(sel) {
   }).join('');
 }
 
+// 학교 버튼을 나란히, 고른 학교의 주차를 버튼으로(왼쪽부터 오래된 주 → 최근 주)
+function setPicker(set) {
+  var d = A.data, by = {};
+  d.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
+  var schools = Object.keys(by).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
+  var mine = (by[set.school] || []).slice().sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+  return '<div class="setpick"><div class="toolbar"><span class="spl">학교</span><div class="chips">' + schools.map(function (sc) {
+      return '<button class="chip' + (sc === set.school ? ' on' : '') + '" data-act="wk-school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
+    }).join('') + '</div></div>' +
+    '<div class="toolbar"><span class="spl">주차</span><div class="chips">' + mine.map(function (s) {
+      return '<button class="chip' + (s.id === set.id ? ' on' : '') + '" data-act="wk-set" data-id="' + h(s.id) + '">' + h(s.week) + (s.open ? '' : ' <small>마감</small>') + '</button>';
+    }).join('') + '</div></div></div>';
+}
 function tabWeek() {
   var d = A.data, set = d.setById[A.setId];
   if (!set) return '<p class="empty">클리닉 세트가 아직 없어요. "클리닉 세트" 탭에서 먼저 만들어 주세요.</p>';
@@ -1399,7 +1416,7 @@ function tabWeek() {
   if (!items.length) {
     var came0 = {}; (d.checks || []).forEach(function (c) { if (c.setId === set.id && ckCame(c)) came0[c.studentId] = 1; });
     var notYet = exp.filter(function (s) { return !came0[s.id]; });
-    return '<div class="toolbar"><label for="sel-set">세트</label><select id="sel-set">' + setOptions(set.id) + '</select></div>' +
+    return setPicker(set) +
       '<p class="note">학생이 입력할 문항이 없는 세트예요. 숙제 검사에서 \'왔음\'을 누른 학생은 오늘 결과에 학부모 문자가 만들어져요.</p>' +
       '<div class="kpis"><div><span>왔음</span><strong class="num">' + exp.filter(function (s) { return came0[s.id]; }).length + '<small> / ' + exp.length + '</small></strong></div></div>' +
       (notYet.length ? '<section class="block"><h2>\'왔음\' 표시 안 한 학생 <small>' + notYet.length + '명</small></h2><div class="chips">' + notYet.map(function (s) { return '<button class="chip todo" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button>'; }).join('') + '</div></section>' : '');
@@ -1413,7 +1430,7 @@ function tabWeek() {
 
   var crs = subs.map(function (s) { return subCredit(items, s); }), partial = setPartial(items);
   var avgCr = crs.length ? crs.reduce(function (a, b) { return a + b; }, 0) / crs.length : 0;
-  var html = '<div class="toolbar"><label for="sel-set">세트</label><select id="sel-set">' + setOptions(set.id) + '</select></div>';
+  var html = setPicker(set);
   var subDone = exp.filter(function (s) { return subBy[s.id]; }).length;
   html += '<div class="kpis"><div><span>제출</span><strong class="num">' + subDone + '<small> / ' + exp.length + '</small></strong></div>' +
     (partial ? '<div><span>평균 정답률</span><strong class="num">' + pct(n ? avgCr / n : 0) + '</strong></div>' : '<div><span>평균 맞힌 개수</span><strong class="num">' + avg.toFixed(1) + '<small> / ' + n + '</small></strong></div>') +
@@ -2502,6 +2519,11 @@ function onClick(ev) {
   if (act === 'tab') { A.ckFocused = false; A.tab = t.dataset.tab; A.confirm = null; A.edit = null; return render(); }
   if (act === 'reload') { loadAdmin().then(function () { toast('새로 불러왔어요.'); }); return; }
   if (act === 'school') { A.school = t.dataset.v; return render(); }
+  if (act === 'wk-school' || act === 'wk-set') {
+    var pick = act === 'wk-set' ? A.data.setById[id] : A.data.sets.filter(function (s) { return s.school === t.dataset.v; }).sort(function (a, b) { return String(b.createdAt).localeCompare(String(a.createdAt)); })[0];
+    if (pick) { A.setId = pick.id; A.showAllItems = false; A.showAllQ = false; }
+    return render();
+  }
   if (act === 'ach') {
     var k2 = t.dataset.set + ':' + t.dataset.st;
     A.extras[k2] = extraOf(t.dataset.set, t.dataset.st) === t.dataset.v ? '' : t.dataset.v;
