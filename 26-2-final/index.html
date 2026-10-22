@@ -282,6 +282,26 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .fbchips { gap: 4px; }
 .fbchips .chip { font-size: 0.74rem; padding: 2px 8px; }
 .relog { max-width: 360px; margin: 10vh auto 0; }
+.term-t { border-collapse: separate; border-spacing: 0; width: auto; }
+.term-t th, .term-t td { padding: 3px 5px; text-align: center; border-bottom: 0; }
+.term-t thead th { border-bottom: 1px solid var(--line-strong); }
+.term-t .tn { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; min-width: 5.5em; border-right: 1px solid var(--line); white-space: nowrap; }
+.term-t td.tn { vertical-align: middle; border-bottom: 1px solid var(--line); }
+.term-t .tl { font-size: 0.72rem; color: var(--muted); text-align: left; white-space: nowrap; padding-right: 8px; }
+.term-t tr.tlast td { border-bottom: 1px solid var(--line); padding-bottom: 6px; }
+.term-t tr.trow:not(.tlast) td:not(.tn) { padding-bottom: 1px; }
+.term-t tr.tgrp td { background: var(--paper); font-weight: 700; font-size: 0.85rem; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.sq { display: inline-block; width: 26px; height: 20px; border-radius: 4px; vertical-align: middle; font-family: var(--f-num); font-size: 0.68rem; font-weight: 700; line-height: 20px; text-align: center; color: var(--sheet); font-style: normal; }
+.sq.g { background: var(--ok); } .sq.o { background: var(--warn); } .sq.r { background: var(--bad); }
+.sq.n { border: 1.5px dashed var(--line-strong); opacity: 0.45; }
+.sq.x, .sq.none { color: var(--muted); font-weight: 400; }
+table.tlegend { width: fit-content; align-self: flex-start; }
+.tlegend { border-collapse: collapse; font-size: 0.8rem; color: var(--muted); margin: 6px 0; }
+.tlegend th { text-align: left; padding: 2px 12px 2px 0; font-weight: 600; white-space: nowrap; }
+.tlegend td { padding: 2px 14px 2px 0; }
+.tlegend .sq { width: 18px; height: 14px; line-height: 14px; margin-right: 6px; }
+.toolbar input.tq { width: 160px; flex: 0 0 auto; }
+.tscroll.tfit { width: fit-content; max-width: 100%; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
@@ -1288,7 +1308,7 @@ function applyAdmin(r) {
   }
 }
 function viewAdmin() {
-  var tabs = [['check', '숙제 검사'], ['today', '오늘 결과'], ['week', '세트별 결과'], ['stats', '누적 분석'], ['students', '학생'], ['sets', '클리닉 세트']];
+  var tabs = [['check', '숙제 검사'], ['today', '오늘 결과'], ['week', '세트별 결과'], ['stats', '누적 분석'], ['term', '내신 현황'], ['students', '학생'], ['sets', '클리닉 세트']];
   var html = '<main class="wide"><header class="abar"><h1><img src="' + MASCOT + '" alt=""> 클리닉 트래커 관리</h1><nav class="tabs">' + tabs.map(function (t) {
     return '<button class="' + (A.tab === t[0] ? 'on' : '') + '" data-act="tab" data-tab="' + t[0] + '">' + t[1] + '</button>';
   }).join('') + '</nav><div class="abar-r"><button class="link" data-act="reload">새로고침</button><button class="link" data-act="logout">로그아웃</button></div></header>';
@@ -1297,6 +1317,7 @@ function viewAdmin() {
   else if (A.tab === 'week') html += tabWeek();
   else if (A.tab === 'stats') html += tabStats();
   else if (A.tab === 'students') html += tabStudents();
+  else if (A.tab === 'term') html += tabTerm();
   else html += tabSets();
   html += '</main>';
   if (A.detail) html += studentModal(A.detail);
@@ -1457,6 +1478,106 @@ function heat(b) {
   if (!b || !b.n) return '<td class="heat empty-c">–</td>';
   var r = rate(b);
   return '<td class="heat' + (b.n < 5 ? ' few' : '') + '" style="--r:' + Math.min(1, r * 1.6).toFixed(2) + '"><b>' + pct(r) + '</b><small>' + b.n + '</small></td>';
+}
+/* ---------- 내신 현황: 주차별 색칸 ---------- */
+// 기본 9주(10.3주~12.2주) + 세트에 다른 주차(10.3주 이후)가 있으면 그 주도 칸으로
+var TERM_WEEKS = ['10.3주', '10.4주', '10.5주', '11.1주', '11.2주', '11.3주', '11.4주', '12.1주', '12.2주'];
+function termKey(w) { var m = /^\s*(\d{1,2})\s*\.\s*(\d)/.exec(String(w || '')); return m ? Number(m[1]) * 10 + Number(m[2]) : null; }
+function termCols(d) {
+  var ks = TERM_WEEKS.map(termKey);
+  d.sets.forEach(function (s) { var k = termKey(s.week); if (k !== null && k >= 103 && k <= 129 && ks.indexOf(k) < 0) ks.push(k); });
+  return ks.sort(function (a, b) { return a - b; });
+}
+var TERM_RANK = { r: 4, o: 3, n: 2, g: 1, x: 0 };
+function termWorst(list) { return list.slice().sort(function (a, b) { return TERM_RANK[b.c] - TERM_RANK[a.c]; })[0]; }
+// 한 학생·한 세트의 세 줄(클리닉·숙제·성취도) 상태. c: g 초록, o 주황, r 빨강, n 아직(점선), x 해당 없음(–)
+function termCell(set, st, ctx) {
+  var d = A.data, items = d.items[set.id] || [], key = set.id + '|' + st.id, sub = ctx.sub[key];
+  var g = gradesFor(set.id)[st.id] || {}, hw = set.homework || [];
+  var graded = hw.filter(function (x) { return g[x]; }), came = graded.length > 0 || !!extraOf(set.id, st.id);
+  var end = ctx.end[set.id], done = set.open === false || !!end;
+  var pre = !!(st.joinedAt && end && String(st.joinedAt) >= String(end));
+  var wait = function (t) { return pre ? { c: 'n', t: '등록 전' } : done ? { c: 'r', t: t } : { c: 'n', t: '아직' }; };
+  var cl, hwc, ac;
+  if (sub && items.length) {
+    var nb = Object.keys(blankNos(items, sub)).length;
+    cl = nb ? { c: 'o', t: 'OMR 제출 · 안 푼 문항 ' + nb + '개' } : { c: 'g', t: 'OMR 제출' };
+  } else if (came) cl = items.length ? { c: 'o', t: '출석했지만 OMR 미제출' } : { c: 'g', t: '출석' };
+  else cl = wait('결석');
+  if (!hw.length) hwc = { c: 'x', t: '숙제 없음' };
+  else if (!graded.length) hwc = wait('숙제 검사 기록 없음');
+  else {
+    var vs = hw.map(function (x) { return g[x] || ''; }), txt = hw.map(function (x) { return x + ' ' + (g[x] || '-'); }).join(' · ');
+    hwc = { c: vs.indexOf('F') >= 0 ? 'r' : vs.every(function (v) { return v === 'A'; }) ? 'g' : 'o', t: txt };
+  }
+  if (!items.length) ac = { c: 'x', t: '확인 테스트 없음' };
+  else if (!sub) ac = { c: 'x', t: '제출 없음' };
+  else {
+    var acc = subCredit(items, sub) / items.length, part = setPartial(items), hi = part ? 0.7 : 0.8, lo = part ? 0.5 : 0.6;
+    ac = { c: acc >= hi ? 'g' : acc >= lo ? 'o' : 'r', t: '정답률 ' + pct(acc) + (part ? ' (무한선지 · 부분 점수)' : ''), v: Math.round(acc * 100) };
+  }
+  return [cl, hwc, ac];
+}
+function termSq(o, wk) {
+  var label = o.c === 'x' ? '–' : o.v !== undefined ? o.v : '';
+  return '<span class="sq ' + o.c + '" title="' + h(wk + ' · ' + o.t) + '">' + label + '</span>';
+}
+function tabTerm() {
+  var d = A.data, cols = termCols(d);
+  if (A.termAch === undefined) A.termAch = store_get('termAch') !== '0';
+  // 학교별·주차별 세트, 세트가 끝난 시각(같은 학교 다음 세트가 만들어진 때)
+  var by = {}, end = {};
+  d.schools.forEach(function (sc) {
+    var ss = d.sets.filter(function (s) { return s.school === sc; }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+    ss.forEach(function (s, i) { var k = termKey(s.week); if (k !== null) ((by[sc] || (by[sc] = {}))[k] || (by[sc][k] = [])).push(s); end[s.id] = ss[i + 1] ? ss[i + 1].createdAt : null; });
+  });
+  var ctx = { sub: {}, end: end };
+  d.subs.forEach(function (s) { ctx.sub[s.setId + '|' + s.studentId] = s; });
+  var studs = d.students.filter(function (s) { return s.status === 'active' && (A.school === '전체' || s.school === A.school); })
+    .sort(function (a, b) { return a.school.localeCompare(b.school, 'ko') || a.name.localeCompare(b.name, 'ko'); });
+  var months = []; cols.forEach(function (k) { var m = Math.floor(k / 10); if (!months.length || months[months.length - 1].m !== m) months.push({ m: m, n: 0 }); months[months.length - 1].n++; });
+  var lines = A.termAch ? [['클리닉', 0], ['숙제', 1], ['성취도', 2]] : [['클리닉', 0], ['숙제', 1]];
+  var html = '<div class="toolbar"><span>학교</span><div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
+    return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
+  }).join('') + '</div><input id="in-tq" class="tq" placeholder="이름 또는 초성" value="' + h(A.tq || '') + '" autocomplete="off">' +
+    '<label class="inline"><input type="checkbox" id="chk-tach"' + (A.termAch ? ' checked' : '') + '> 성취도 줄</label></div>' +
+    '<table class="tlegend"><tr><th>클리닉</th><td><i class="sq g"></i>출석·OMR 제출</td><td><i class="sq o"></i>풀다 말고 제출 · 왔는데 OMR 안 냄</td><td><i class="sq r"></i>결석</td></tr>' +
+    '<tr><th>숙제</th><td><i class="sq g"></i>모두 A</td><td><i class="sq o"></i>B 있음</td><td><i class="sq r"></i>F 있음 · 검사 기록 없음</td></tr>' +
+    '<tr><th>성취도</th><td><i class="sq g"></i>정답률 80% 이상</td><td><i class="sq o"></i>60% 이상</td><td><i class="sq r"></i>60% 미만</td></tr>' +
+    '<tr><th></th><td><i class="sq n"></i>아직(받는 중인 주) · 등록 전</td><td><i class="sq x">–</i>해당 없음</td><td><i class="sq none">·</i>그 주 세트 없음</td></tr></table>' +
+    '<p class="note">칸에 마우스를 올리면 자세한 내용이 보여요. 성취도 칸 숫자는 정답률(%)이고, 무한선지 세트는 70% · 50%를 기준으로 색을 나눠요. 지난 주차인데 기록이 없으면 빨강이에요.</p>';
+  if (!studs.length) return html + '<p class="empty">학생이 없어요.</p>';
+  var head = '<tr><th class="tn" rowspan="2">이름</th><th rowspan="2"></th>' + months.map(function (o) { return '<th class="c" colspan="' + o.n + '">' + o.m + '월</th>'; }).join('') + '</tr>' +
+    '<tr>' + cols.map(function (k) { return '<th class="c">' + (k % 10) + '주</th>'; }).join('') + '</tr>';
+  var body = '', lastSc = null;
+  studs.forEach(function (st) {
+    if (st.school !== lastSc) { lastSc = st.school; body += '<tr class="tgrp"><td class="tn" colspan="' + (cols.length + 2) + '">' + h(fullSchool(st.school)) + ' <small class="muted">' + studs.filter(function (x) { return x.school === st.school; }).length + '명</small></td></tr>'; }
+    var cells = cols.map(function (k) {
+      var ss = (by[st.school] || {})[k];
+      if (!ss || !ss.length) return null;
+      var per = ss.map(function (s) { return termCell(s, st, ctx); });
+      return [0, 1, 2].map(function (i) { return termWorst(per.map(function (p) { return p[i]; })); });
+    });
+    lines.forEach(function (ln, j) {
+      body += '<tr class="trow' + (j === lines.length - 1 ? ' tlast' : '') + '" data-sname="' + h(st.name) + '">' +
+        (j === 0 ? '<td class="tn" rowspan="' + lines.length + '"><button class="link" data-act="detail" data-id="' + st.id + '">' + h(st.name) + '</button></td>' : '') +
+        '<td class="tl">' + ln[0] + '</td>' + cells.map(function (c, ci) {
+          var wk = (Math.floor(cols[ci] / 10)) + '.' + (cols[ci] % 10) + '주';
+          return '<td class="c">' + (c ? termSq(c[ln[1]], wk) : '<span class="sq none" title="' + h(wk + ' · 세트 없음') + '">·</span>') + '</td>';
+        }).join('') + '</tr>';
+    });
+  });
+  html += '<div class="tscroll tfit"><table class="t term-t" id="term-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+    '<p class="empty" id="term-none" hidden>찾는 학생이 없어요.</p>';
+  setTimeout(termFilter, 0);
+  return html;
+}
+function termFilter() {
+  var t = document.getElementById('term-t'); if (!t) return;
+  var q = A.tq || '', shown = 0, seen = {};
+  t.querySelectorAll('tr[data-sname]').forEach(function (r) { var ok = !q || nameMatch(r.dataset.sname, q); r.hidden = !ok; if (ok && !seen[r.dataset.sname]) { seen[r.dataset.sname] = 1; shown++; } });
+  t.querySelectorAll('tr.tgrp').forEach(function (r) { r.hidden = !!q; });
+  var none = document.getElementById('term-none'); if (none) none.hidden = shown > 0;
 }
 function tabStats() {
   var d = A.data, schools = d.schools;
@@ -2576,12 +2697,14 @@ function syncAdmin() {
     if (subsChanged) d.subs = r.subs || [];
     if (!changed.length && !subsChanged) return;
     if (A.tab === 'check') changed.forEach(function (c) { refreshCkRow(c.setId, c.studentId); });
+    else if (A.tab === 'term') renderKeep();
     else if (A.tab === 'today') toast('다른 기기·학생에게서 새 결과가 들어왔어요. "오늘 결과" 탭을 다시 누르면 보여요.');
   });
 }
 function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y); }
 
 function onChange(ev) {
+  if (ev.target.id === 'chk-tach') { A.termAch = ev.target.checked; store_set('termAch', A.termAch ? '1' : '0'); return renderKeep(); }
   var t = ev.target;
   if (t.dataset && t.dataset.extra) {
     var kp = t.dataset.extra.split(':'); A.extras[t.dataset.extra] = t.value.trim();
@@ -2640,6 +2763,7 @@ function onInput(ev) {
   if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
   if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); applyFilter(); return; }
   if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); applyFilter(); return; }
+  if (ev.target.id === 'in-tq') { A.tq = ev.target.value.trim(); termFilter(); return; }
 }
 /* 한글 입력 중(조합 중)인 마지막 글자가 빠지지 않게: 입력칸을 먼저 확정시킨 뒤 처리 */
 function flushIme(ev, fn) {
