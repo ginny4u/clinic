@@ -1,6 +1,19 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>내신 클리닉 트래커</title>
+<script>
+/* 홈 화면 앱: 학생·학부모 화면마다 다른 이름·아이콘 */
+(function () {
+  var p = /(?:^|&)parent(?:[=&]|$)/.test(location.search.slice(1)), hd = document.head;
+  function add(tag, at) { var e = document.createElement(tag); Object.keys(at).forEach(function (k) { e.setAttribute(k, at[k]); }); hd.appendChild(e); }
+  add('link', { rel: 'manifest', href: p ? 'parent.webmanifest' : 'manifest.webmanifest' });
+  add('link', { rel: 'apple-touch-icon', href: p ? 'icons/p-apple-touch-icon.png' : 'icons/apple-touch-icon.png' });
+  add('meta', { name: 'apple-mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'mobile-web-app-capable', content: 'yes' });
+  add('meta', { name: 'apple-mobile-web-app-title', content: p ? '클리닉 리포트' : '클리닉 트래커' });
+  add('meta', { name: 'theme-color', content: p ? '#2557E0' : '#f3f4f6' });
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&display=swap">
@@ -320,6 +333,22 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .setpick .chip small { opacity: 0.7; margin-left: 2px; }
 .absbtns { margin-left: auto; display: inline-flex; gap: 4px; }
 .mini.absent.notice.on { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); font-weight: 600; }
+
+/* ===== 홈 화면에 추가 ===== */
+.a2hs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; border: 1px solid var(--line); background: var(--sheet); border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; }
+.a2hs-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.a2hs-t b { font-size: 15px; }
+.a2hs-t span { font-size: 13px; color: var(--muted); }
+.a2hs-b { display: flex; gap: 6px; align-items: center; }
+.a2hs-go { border: none; border-radius: 6px; background: var(--accent); color: var(--accent-ink); font: inherit; font-weight: 700; font-size: 14px; padding: 9px 14px; cursor: pointer; }
+.a2hs-x { border: none; background: none; color: var(--muted); font: inherit; font-size: 13px; padding: 9px 6px; cursor: pointer; text-decoration: underline; }
+.a2hs-help { flex-basis: 100%; margin: 0; font-size: 14px; line-height: 1.65; border-top: 1px solid var(--line); padding-top: 10px; }
+.a2hs-help svg { vertical-align: -3px; }
+.a2hs.parent { max-width: 430px; margin: 0 auto; border: none; border-radius: 0; background: #EAF0FD; color: #182033; font-family: 'Noto Sans KR', system-ui, sans-serif; padding: 12px 16px; }
+.a2hs.parent .a2hs-t span, .a2hs.parent .a2hs-x { color: #5B6577; }
+.a2hs.parent .a2hs-go { background: #2557E0; color: #FFFFFF; }
+.a2hs.parent .a2hs-help { border-top-color: #C9D1DE; }
+
 .mini.absent.nos.on { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
 .peekbar { position: sticky; top: 0; z-index: 6; margin: 0 -16px 8px; padding: 8px 16px; background: var(--warn-bg); color: var(--warn); font-size: 0.88rem; border-bottom: 1px solid var(--warn); }
 .peekbar .link { margin-left: 6px; }
@@ -1180,6 +1209,7 @@ function viewHome() {
   var entries = HOME.history.map(function (x) { return { items: HOME.items[x.setId] || [], marks: x.marks, setId: x.setId, skip: toSkip(x.blank), credit: x.credit }; });
   var st = calc(entries);
   var html = '<main>' + masthead(h(me.school) + ' · ' + h(me.name) + ' <button class="link" data-act="logout">로그아웃</button>', 'sm');
+  if (!S.peek) html += '<div id="a2hs-slot">' + a2hsHtml() + '</div>';
   html += '<section class="block"><h2>이번 주</h2>';
   if (!open.length) html += '<p class="empty">지금 제출할 수 있는 클리닉이 없습니다.</p>';
   html += '<div class="cards">' + open.map(function (s) {
@@ -2961,6 +2991,53 @@ function afterRender() {
   if (first && !('ontouchstart' in window)) first.focus();
 }
 
+
+/* ===== 홈 화면에 추가(앱처럼 쓰기) ===== */
+var A2HS = { evt: null, done: false, help: false, mode: /(?:^|&)parent(?:[=&]|$)/.test(location.search.slice(1)) ? 'parent' : 'student' };
+window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); A2HS.evt = e; a2hsRefresh(); });
+window.addEventListener('appinstalled', function () { A2HS.done = true; a2hsRefresh(); });
+function a2hsStandalone() { try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; } catch (e) { return false; } }
+function a2hsEnv() {
+  var ua = navigator.userAgent || '';
+  if (/KAKAOTALK/i.test(ua)) return 'kakao';
+  if (/NAVER\(inapp|Instagram|FBAN|FBAV|Line\/|DaumApps|BAND\/|everytimeApp|; wv\)/i.test(ua)) return 'inapp';
+  if (/iPhone|iPad|iPod/i.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) return 'ios';
+  if (/Android/i.test(ua)) return 'android';
+  return 'desktop';
+}
+function a2hsKakaoUrl() { return 'kakaotalk://web/openExternal?url=' + encodeURIComponent(location.href.replace(/#.*$/, '')); }
+var A2HS_SHARE = '<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M8 7l4-4 4 4"></path><path d="M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"></path></svg>';
+function a2hsHelp(env) {
+  if (env === 'ios') return '사파리 아래쪽 가운데 <b>공유 버튼</b>(' + A2HS_SHARE + ')을 누르고, 목록을 내려 <b>홈 화면에 추가</b>를 눌러 주세요. 크롬에서는 주소창 오른쪽 공유 버튼에 있어요.';
+  if (env === 'inapp') return '지금은 다른 앱 안에서 열린 화면이라 추가할 수 없어요. 오른쪽 위(또는 아래) 메뉴에서 <b>다른 브라우저로 열기</b>를 누른 뒤, 거기서 다시 <b>추가하기</b>를 눌러 주세요.';
+  return '브라우저 메뉴(<b>⋮</b> 또는 <b>≡</b>)를 누르고 <b>홈 화면에 추가</b>를 눌러 주세요. 삼성 인터넷은 <b>현재 페이지 추가 → 홈 화면</b>이에요.';
+}
+// 로그인 뒤 화면에 넣는 띠. 이미 앱으로 열었거나, 닫았거나, 컴퓨터에서 설치 창을 띄울 수 없으면 비움
+function a2hsHtml() {
+  if (a2hsStandalone() || A2HS.done || store_get('a2hs-hide-' + A2HS.mode) === '1') return '';
+  var env = a2hsEnv();
+  if (env === 'desktop' && !A2HS.evt) return '';
+  return '<div class="a2hs ' + A2HS.mode + '" id="a2hs"><div class="a2hs-t"><b>홈 화면에 추가</b><span>앱처럼 바로 열 수 있어요.</span></div>' +
+    '<div class="a2hs-b"><button type="button" class="a2hs-go" data-a2hs="go">추가하기</button><button type="button" class="a2hs-x" data-a2hs="close">닫기</button></div>' +
+    (A2HS.help ? '<p class="a2hs-help">' + a2hsHelp(env) + '</p>' : '') + '</div>';
+}
+function a2hsRefresh() { var s = document.getElementById('a2hs-slot'); if (s) s.innerHTML = a2hsHtml(); }
+document.addEventListener('click', function (ev) {
+  var t = ev.target && ev.target.closest ? ev.target.closest('[data-a2hs]') : null;
+  if (!t) return;
+  if (t.dataset.a2hs === 'close') { store_set('a2hs-hide-' + A2HS.mode, '1'); a2hsRefresh(); return; }
+  if (A2HS.evt) {
+    var e = A2HS.evt; A2HS.evt = null;
+    e.prompt();
+    (e.userChoice || Promise.resolve({})).then(function (c) { if (c && c.outcome === 'accepted') A2HS.done = true; a2hsRefresh(); });
+    return;
+  }
+  if (a2hsEnv() === 'kakao') { location.href = a2hsKakaoUrl(); return; }
+  A2HS.help = !A2HS.help; a2hsRefresh();
+});
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
 function boot() {
   root = document.getElementById('app');
   document.addEventListener('click', onClickSafe);
