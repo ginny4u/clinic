@@ -316,7 +316,7 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .setpick .spl { font-size: 0.85rem; color: var(--muted); min-width: 2.4em; }
 .setpick .chip { padding: 5px 14px; font-size: 0.9rem; }
 .setpick .chip small { opacity: 0.7; margin-left: 2px; }
-.mini.absent { margin-left: 4px; }
+.mini.absent { margin-left: auto; }
 .mini.absent.on { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
 .peekbar { position: sticky; top: 0; z-index: 6; margin: 0 -16px 8px; padding: 8px 16px; background: var(--warn-bg); color: var(--warn); font-size: 0.88rem; border-bottom: 1px solid var(--warn); }
 .peekbar .link { margin-left: 6px; }
@@ -1914,11 +1914,11 @@ function ckRowHtml(st, set) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
         }).join('') + '</div></div>';
-      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' + ckAbsentBtn(set, st, row) : '<div class="ck-item"><span>클리닉</span><div class="seg"><button type="button" class="' + (extraOf(set.id, st.id) && extraOf(set.id, st.id) !== '결석' ? 'on gA' : '') + '" data-act="came" data-set="' + set.id + '" data-st="' + st.id + '">왔음</button></div></div>' + ckAbsentBtn(set, st, row) + '<span class="muted">숙제 없음</span>') +
+      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<div class="ck-item"><span>클리닉</span><div class="seg"><button type="button" class="' + (extraOf(set.id, st.id) && extraOf(set.id, st.id) !== '결석' ? 'on gA' : '') + '" data-act="came" data-set="' + set.id + '" data-st="' + st.id + '">왔음</button></div></div><span class="muted">숙제 없음</span>') +
       (!set.evalName ? '' : '<div class="ck-item ck-ach"><span>' + h(set.evalName) + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
         var on = extraOf(set.id, st.id) === v;
         return '<button type="button" class="' + (on ? 'on g' + (v === 'A+' || v === 'A' ? 'A' : v === 'F' ? 'F' : 'B') : '') + '" data-act="ach" data-set="' + set.id + '" data-st="' + st.id + '" data-v="' + v + '">' + v + '</button>';
-      }).join('') + '</div></div>') + '</div></div>';
+      }).join('') + '</div></div>') + ckAbsentBtn(set, st, row) + '</div></div>';
 }
 function refreshCkRow(setId, sid) {
   var el = document.getElementById('ck-' + setId + '-' + sid), st = A.data.stuById[sid], set = A.data.setById[setId];
@@ -2239,6 +2239,8 @@ function fbBox(r, i) {
 function smsText(r) {
   var exam = A.exam || '기말고사';
   var secs = [], absent = r.extra === '결석' && !(r.ck && Object.keys(r.ck.grades || {}).length);
+  if (absent && r.set.homework.length) secs.push(['■ 과제 수행 여부'].concat(r.set.homework.map(function (hw) { return '- ' + hw + ' : ○△✕'; })));
+  if (absent && r.n && !r.sub) secs.push(['■ 확인 암기 테스트 성취도', '- 총 ' + r.n + '문항 중 문항 정답']);
   if (r.set.homework.length && !absent) {
     var hwLines = ['■ 과제 수행 여부'].concat(r.set.homework.map(function (hw) { var g = r.ck && r.ck.grades[hw]; return '- ' + hw + ' : ' + (g ? MARK[g] : '-'); }));
     if (r.set.homework.some(function (hw) { var g = r.ck && r.ck.grades[hw]; return g === 'B' || g === 'F'; })) hwLines.push('* 미흡한 과제는 학원에서 완료했습니다.');
