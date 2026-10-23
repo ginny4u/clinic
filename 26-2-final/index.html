@@ -1923,25 +1923,29 @@ function ckDivHtml(grp) {
 // 출석 가져옴: 출석·체크 전 → 또 온 학생 → 오늘 출석 → 오늘 결석 → 출석 명단에 없음 → 전에 체크 → 전에 결석
 // 안 가져옴: 체크 전 → 오늘 출석 → 오늘 결석 → 전에 체크 → 전에 결석
 function ckRank(g) { return A.attN ? [0, 4, 2, 5, 1, 3, 6][g] : [0, 1, 2, 4, 6, 3, 5][g]; }
-function ckCmp(a, b) { return ckRank(a.g) - ckRank(b.g) || a.name.localeCompare(b.name); }
+function ckCmp(a, b) { return ckRank(a.g) - ckRank(b.g) || ((a.g === 5 || a.g === 6) ? (a.ab || 0) - (b.ab || 0) : 0) || a.name.localeCompare(b.name); }
 // 지금 화면 순서가 체크 상태와 어긋났는지 보고 '정리' 버튼·남은 인원을 갱신
 function ckMark() {
   var list = $('#ck-list'); if (!list) return;
   var rows = [].slice.call(list.querySelectorAll('.ckrow')), left = 0;
-  var info = rows.map(function (el) { var g = ckGroup(el.dataset.set, el.dataset.st); el.classList.toggle('done', g >= 2); if (g < 2) left++; return { el: el, g: g, name: el.dataset.name }; });
+  var info = rows.map(function (el) { var g = ckGroup(el.dataset.set, el.dataset.st); el.classList.toggle('done', g >= 2); if (g < 2) left++; return { el: el, g: g, name: el.dataset.name, ab: extraOf(el.dataset.set, el.dataset.st) === '무단' ? 1 : 0 }; });
   var sorted = info.slice().sort(ckCmp), off = sorted.some(function (o, i) { return o.el !== info[i].el; });
   // 줄 순서가 맞아도 묶음 제목 아래 자리가 바뀐 경우(예: 결석 처리)도 정리 필요
   if (!off) { var curG = null; [].slice.call(list.children).forEach(function (el) { if (el.classList.contains('ck-div')) curG = el.dataset.grp; else if (el.classList.contains('ckrow')) { var o = info.filter(function (x) { return x.el === el; })[0]; if (o && String(o.g) !== String(curG)) off = true; } }); }
   var btn = $('#ck-sort'); if (btn) btn.hidden = !off;
   // 묶음 제목 옆 인원: 지금 상태 기준(줄을 아직 정리하지 않았어도 맞는 숫자)
-  var cnt2 = {}; info.forEach(function (o) { cnt2[o.g] = (cnt2[o.g] || 0) + 1; });
-  [].slice.call(list.querySelectorAll('.ck-div')).forEach(function (dv) { var c = dv.querySelector('.ck-cnt'); if (c) c.textContent = '(' + (cnt2[dv.dataset.grp] || 0) + '명)'; });
+  var cnt2 = {}, nos2 = {}; info.forEach(function (o) { cnt2[o.g] = (cnt2[o.g] || 0) + 1; if (o.ab) nos2[o.g] = (nos2[o.g] || 0) + 1; });
+  [].slice.call(list.querySelectorAll('.ck-div')).forEach(function (dv) {
+    var c = dv.querySelector('.ck-cnt'); if (!c) return;
+    var gk = dv.dataset.grp, n = cnt2[gk] || 0, ns = nos2[gk] || 0;
+    c.textContent = '(' + n + '명' + ((gk === '5' || gk === '6') && n ? ' · 고지 ' + (n - ns) + ' · 무단 ' + ns : '') + ')';
+  });
   var cnt = $('#ck-left'); if (cnt) cnt.textContent = left ? '체크 전 ' + left + '명' : '모두 체크했어요';
 }
 // 체크한 학생을 아래로(행을 다시 그리지 않고 순서만 바꿔서 검색창 입력이 끊기지 않게)
 function ckResort() {
   var list = $('#ck-list'); if (!list) return;
-  var info = [].slice.call(list.querySelectorAll('.ckrow')).map(function (el) { return { el: el, g: ckGroup(el.dataset.set, el.dataset.st), name: el.dataset.name }; }).sort(ckCmp);
+  var info = [].slice.call(list.querySelectorAll('.ckrow')).map(function (el) { return { el: el, g: ckGroup(el.dataset.set, el.dataset.st), name: el.dataset.name, ab: extraOf(el.dataset.set, el.dataset.st) === '무단' ? 1 : 0 }; }).sort(ckCmp);
   [].slice.call(list.querySelectorAll('.ck-div')).forEach(function (x) { x.remove(); });
   var cur = -1;
   info.forEach(function (o) {
@@ -1961,7 +1965,7 @@ function tabCheck() {
   }).map(function (st) { return { st: st, set: A.ckSet === 'ALL' ? bySchool[st.school] : d.setById[A.ckSet] }; })
     ;
   var am = attMatch(d); A.attIds = am.ids; A.attN = am.n;
-  rows.forEach(function (r) { r.g = ckGroup(r.set.id, r.st.id); r.name = r.st.name; });
+  rows.forEach(function (r) { r.g = ckGroup(r.set.id, r.st.id); r.name = r.st.name; r.ab = extraOf(r.set.id, r.st.id) === '무단' ? 1 : 0; });
   rows.sort(ckCmp);
   var html = '<div class="toolbar ck-bar"><input id="in-ckq" class="ck-search" placeholder="이름 또는 초성 (예: ㄱㅈㅇ)" value="' + h(A.ckQ) + '" autocomplete="off">' +
     '<select id="sel-ck" aria-label="세트"><option value="ALL"' + (A.ckSet === 'ALL' ? ' selected' : '') + '>받는 중인 세트 전체</option>' + setOptions(A.ckSet) + '</select>' +
