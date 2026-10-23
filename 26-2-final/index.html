@@ -1632,7 +1632,7 @@ function termCell(set, st, ctx) {
     var nb = Object.keys(blankNos(items, sub)).length;
     cl = nb ? { c: 'o', t: 'OMR 제출 · 안 푼 문항 ' + nb + '개' } : { c: 'g', t: 'OMR 제출' };
   } else if (came) cl = items.length ? { c: 'o', t: '출석했지만 OMR 미제출' } : { c: 'g', t: '출석' };
-  else if (absentMk) cl = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석 (자료 배부)' };
+  else if (absentMk) cl = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석' };
   else cl = wait('결석');
   if (!hw.length) hwc = { c: 'x', t: '숙제 없음' };
   else if (absentMk) hwc = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석' };
@@ -2342,7 +2342,7 @@ function smsText(r) {
   if (ex && r.set.evalName) secs.push(['■ ' + r.set.evalName + ' 성취도', '- ' + ex + ' ( A+ / A / B / C / F)']);
   // 학생별 피드백을 넣는 중이어도 입력 없는 세트는 피드백이 없으니 진행 사항 문장을 넣음
   var fb = A.addFb ? fbText(r).trim() : '', note = getNote(r.set).trim();
-  if (absent) { var own = A.addFb && A.fbEdit[fbKey(r)] !== undefined ? String(A.fbEdit[fbKey(r)]).trim() : ''; note = r.extra === '무단' ? '금주 클리닉 결석했습니다. 확인 부탁 드립니다.' : '개인 사정으로 등원 어렵다고 연락 받았습니다. 클리닉 자료만 배부했습니다.'; fb = own; }
+  if (absent) { var own = A.addFb && A.fbEdit[fbKey(r)] !== undefined ? String(A.fbEdit[fbKey(r)]).trim() : ''; note = r.extra === '무단' ? '금주 클리닉 결석했습니다. 확인 부탁 드립니다.' : '개인 사정으로 등원 어렵다고 연락 받았습니다. 주말 수업 때 자료 받아갈 수 있도록 할 예정입니다.'; fb = own; }
   if (note || fb) secs.push(['■ 클리닉 진행 사항', '- ' + [note, fb].filter(Boolean).join(' ')]);
   var out = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']'];
   secs.forEach(function (x) { out.push(''); out.push.apply(out, x); });
