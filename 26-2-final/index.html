@@ -316,8 +316,9 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .setpick .spl { font-size: 0.85rem; color: var(--muted); min-width: 2.4em; }
 .setpick .chip { padding: 5px 14px; font-size: 0.9rem; }
 .setpick .chip small { opacity: 0.7; margin-left: 2px; }
-.mini.absent { margin-left: auto; }
-.mini.absent.on { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
+.absbtns { margin-left: auto; display: inline-flex; gap: 4px; }
+.mini.absent.notice.on { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); font-weight: 600; }
+.mini.absent.nos.on { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
 .peekbar { position: sticky; top: 0; z-index: 6; margin: 0 -16px 8px; padding: 8px 16px; background: var(--warn-bg); color: var(--warn); font-size: 0.88rem; border-bottom: 1px solid var(--warn); }
 .peekbar .link { margin-left: 6px; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
@@ -1622,7 +1623,7 @@ function termWorst(list) { return list.slice().sort(function (a, b) { return TER
 function termCell(set, st, ctx) {
   var d = A.data, items = d.items[set.id] || [], key = set.id + '|' + st.id, sub = ctx.sub[key];
   var g = gradesFor(set.id)[st.id] || {}, hw = set.homework || [];
-  var exAb = extraOf(set.id, st.id), graded = hw.filter(function (x) { return g[x]; }), absentMk = !graded.length && exAb === '결석', came = graded.length > 0 || (!!exAb && exAb !== '결석');
+  var exAb = extraOf(set.id, st.id), graded = hw.filter(function (x) { return g[x]; }), absentMk = !graded.length && absEx(exAb), came = graded.length > 0 || (!!exAb && !absEx(exAb));
   var end = ctx.end[set.id], done = set.open === false || !!end;
   var pre = !!(st.joinedAt && end && String(st.joinedAt) >= String(end));
   var wait = function (t) { return pre ? { c: 'n', t: '등록 전' } : done ? { c: 'r', t: t } : { c: 'n', t: '아직' }; };
@@ -1631,10 +1632,10 @@ function termCell(set, st, ctx) {
     var nb = Object.keys(blankNos(items, sub)).length;
     cl = nb ? { c: 'o', t: 'OMR 제출 · 안 푼 문항 ' + nb + '개' } : { c: 'g', t: 'OMR 제출' };
   } else if (came) cl = items.length ? { c: 'o', t: '출석했지만 OMR 미제출' } : { c: 'g', t: '출석' };
-  else if (absentMk) cl = { c: 'r', t: '결석 (자료 배부)' };
+  else if (absentMk) cl = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석 (자료 배부)' };
   else cl = wait('결석');
   if (!hw.length) hwc = { c: 'x', t: '숙제 없음' };
-  else if (absentMk) hwc = { c: 'r', t: '결석' };
+  else if (absentMk) hwc = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석' };
   else if (!graded.length) hwc = wait('숙제 검사 기록 없음');
   else {
     var vs = hw.map(function (x) { return g[x] || ''; }), txt = hw.map(function (x) { return x + ' ' + (g[x] || '-'); }).join(' · ');
@@ -1897,7 +1898,7 @@ function attBox(am) {
 // (체크 = 숙제·왔음·추가 평가 중 하나라도. 오늘 = 서버에 저장된 시각이 오늘이거나 이 화면에서 방금 누른 것)
 function ckGroup(setId, sid) {
   var g = gradesFor(setId)[sid] || {};
-  if (!Object.keys(g).length && extraOf(setId, sid) === '결석') {
+  if (!Object.keys(g).length && absEx(extraOf(setId, sid))) {
     // 결석도 오늘 누른 것(5)과 전에 누른 것(6)을 나눔
     if (A.saving[setId + ':' + sid] !== undefined) return 5;
     var ca = (A.data.checks || []).filter(function (x) { return x.setId === setId && x.studentId === sid; })[0];
@@ -1985,10 +1986,13 @@ function extraOf(setId, sid) {
   var e = A.extras[setId + ':' + sid];
   return e !== undefined ? e : (c && c.extra) || '';
 }
+function absEx(x) { return x === '결석' || x === '무단'; }
 function ckAbsentBtn(set, st, row) {
   var ex = extraOf(set.id, st.id);
-  if (Object.keys(row || {}).length || (ex && ex !== '결석')) return '';
-  return '<button type="button" class="mini absent' + (ex === '결석' ? ' on' : '') + '" data-act="absent" data-set="' + set.id + '" data-st="' + st.id + '">결석</button>';
+  if (Object.keys(row || {}).length || (ex && !absEx(ex))) return '';
+  return '<span class="absbtns">' + [['결석', '고지 결석', '개인 사정으로 못 온다고 연락 받음'], ['무단', '무단 결석', '연락 없이 안 옴']].map(function (p) {
+    return '<button type="button" class="mini absent ' + (p[0] === '무단' ? 'nos' : 'notice') + (ex === p[0] ? ' on' : '') + '" data-act="absent" data-v="' + p[0] + '" data-set="' + set.id + '" data-st="' + st.id + '" title="' + p[2] + '">' + p[1] + '</button>';
+  }).join('') + '</span>';
 }
 function ckRowHtml(st, set) {
   var r = { st: st, set: set };
@@ -2000,7 +2004,7 @@ function ckRowHtml(st, set) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
           return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
         }).join('') + '</div></div>';
-      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<div class="ck-item"><span>클리닉</span><div class="seg"><button type="button" class="' + (extraOf(set.id, st.id) && extraOf(set.id, st.id) !== '결석' ? 'on gA' : '') + '" data-act="came" data-set="' + set.id + '" data-st="' + st.id + '">왔음</button></div></div><span class="muted">숙제 없음</span>') +
+      }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<div class="ck-item"><span>클리닉</span><div class="seg"><button type="button" class="' + (extraOf(set.id, st.id) && !absEx(extraOf(set.id, st.id)) ? 'on gA' : '') + '" data-act="came" data-set="' + set.id + '" data-st="' + st.id + '">왔음</button></div></div><span class="muted">숙제 없음</span>') +
       (!set.evalName ? '' : '<div class="ck-item ck-ach"><span>' + h(set.evalName) + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
         var on = extraOf(set.id, st.id) === v;
         return '<button type="button" class="' + (on ? 'on g' + (v === 'A+' || v === 'A' ? 'A' : v === 'F' ? 'F' : 'B') : '') + '" data-act="ach" data-set="' + set.id + '" data-st="' + st.id + '" data-v="' + v + '">' + v + '</button>';
@@ -2322,10 +2326,10 @@ function fbBox(r, i) {
       }).join('') + '</div></div>';
     }).join('');
 }
-function rowAbsent(r) { return r.extra === '결석' && !(r.ck && Object.keys(r.ck.grades || {}).length) && !r.sub; }
+function rowAbsent(r) { return absEx(r.extra) && !(r.ck && Object.keys(r.ck.grades || {}).length) && !r.sub; }
 function smsText(r) {
   var exam = A.exam || '기말고사';
-  var secs = [], absent = r.extra === '결석' && !(r.ck && Object.keys(r.ck.grades || {}).length);
+  var secs = [], absent = absEx(r.extra) && !(r.ck && Object.keys(r.ck.grades || {}).length);
   if (absent && r.set.homework.length) secs.push(['■ 과제 수행 여부'].concat(r.set.homework.map(function (hw) { return '- ' + hw + ' : ○△✕'; })));
   if (absent && r.n && !r.sub) secs.push(['■ 확인 암기 테스트 성취도', '- 총 ' + r.n + '문항 중 문항 정답']);
   if (r.set.homework.length && !absent) {
@@ -2338,7 +2342,7 @@ function smsText(r) {
   if (ex && r.set.evalName) secs.push(['■ ' + r.set.evalName + ' 성취도', '- ' + ex + ' ( A+ / A / B / C / F)']);
   // 학생별 피드백을 넣는 중이어도 입력 없는 세트는 피드백이 없으니 진행 사항 문장을 넣음
   var fb = A.addFb ? fbText(r).trim() : '', note = getNote(r.set).trim();
-  if (absent) { var own = A.addFb && A.fbEdit[fbKey(r)] !== undefined ? String(A.fbEdit[fbKey(r)]).trim() : ''; note = '개인 사정으로 등원하지 못해 클리닉 자료만 배부했습니다.'; fb = own; }
+  if (absent) { var own = A.addFb && A.fbEdit[fbKey(r)] !== undefined ? String(A.fbEdit[fbKey(r)]).trim() : ''; note = r.extra === '무단' ? '금주 클리닉 결석했습니다. 확인 부탁 드립니다.' : '개인 사정으로 등원 어렵다고 연락 받았습니다. 클리닉 자료만 배부했습니다.'; fb = own; }
   if (note || fb) secs.push(['■ 클리닉 진행 사항', '- ' + [note, fb].filter(Boolean).join(' ')]);
   var out = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']'];
   secs.forEach(function (x) { out.push(''); out.push.apply(out, x); });
@@ -2639,14 +2643,15 @@ function onClick(ev) {
   }
   if (act === 'absent') {
     var k4 = t.dataset.set + ':' + t.dataset.st;
-    A.extras[k4] = extraOf(t.dataset.set, t.dataset.st) === '결석' ? '' : '결석';
+    var v4 = t.dataset.v === '무단' ? '무단' : '결석';
+    A.extras[k4] = extraOf(t.dataset.set, t.dataset.st) === v4 ? '' : v4;
     (A.dirty[t.dataset.set] || (A.dirty[t.dataset.set] = {}))[t.dataset.st] = 1;
     A.saving[k4] = ''; (A.touchAt || (A.touchAt = {}))[k4] = Date.now(); queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
     return;
   }
   if (act === 'came') {
     var k3 = t.dataset.set + ':' + t.dataset.st, cur3 = extraOf(t.dataset.set, t.dataset.st);
-    A.extras[k3] = cur3 && cur3 !== '결석' ? '' : '출석';
+    A.extras[k3] = cur3 && !absEx(cur3) ? '' : '출석';
     (A.dirty[t.dataset.set] || (A.dirty[t.dataset.set] = {}))[t.dataset.st] = 1;
     A.saving[k3] = ''; (A.touchAt || (A.touchAt = {}))[k3] = Date.now(); queueCheckSave(); refreshCkRow(t.dataset.set, t.dataset.st);
     var cq3 = $('#in-ckq'); if (cq3 && !('ontouchstart' in window)) { cq3.focus(); cq3.select(); }
@@ -2664,7 +2669,7 @@ function onClick(ev) {
     var setId = t.dataset.set, sid = t.dataset.st, g = gradesFor(setId), row = g[sid] || (g[sid] = {});
     if (act === 'grade-allA') A.data.setById[setId].homework.forEach(function (hw) { row[hw] = 'A'; });
     else { var hw = t.dataset.hw; if (row[hw] === t.dataset.v) delete row[hw]; else row[hw] = t.dataset.v; }
-    if (extraOf(setId, sid) === '결석') A.extras[setId + ':' + sid] = ''; // 숙제를 검사했으면 결석이 아님
+    if (absEx(extraOf(setId, sid))) A.extras[setId + ':' + sid] = ''; // 숙제를 검사했으면 결석이 아님
     (A.dirty[setId] || (A.dirty[setId] = {}))[sid] = 1;
     A.saving[setId + ':' + sid] = ''; (A.touchAt || (A.touchAt = {}))[setId + ':' + sid] = Date.now();
     queueCheckSave(); refreshCkRow(setId, sid);
