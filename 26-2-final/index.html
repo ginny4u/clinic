@@ -252,6 +252,8 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .seg button.on.gA { background: var(--ok-bg); color: var(--ok); font-weight: 700; }
 .seg button.on.gB { background: var(--warn-bg); color: var(--warn); font-weight: 700; }
 .seg button.on.gF { background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.seg button.on.gN { background: var(--bad-bg); color: var(--bad); font-weight: 700; }
+.g-N b, .gmini.g-N { color: var(--bad); }
 .dateinp { width: auto !important; }
 .evalbox { background: var(--sheet); border: 1px solid var(--line); padding: 10px 14px; }
 .evalbox summary small { font-weight: 400; margin-left: 6px; }
@@ -339,7 +341,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 10;
+var CORE_VERSION = 11;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -836,7 +838,7 @@ var CORE_ACTIONS = {
     (Array.isArray(req.list) ? req.list : []).forEach(function (r) {
       if (!ids[r.studentId]) return;
       var g = {};
-      (set.homework || []).forEach(function (h) { var v = r.grades && r.grades[h]; if (['A', 'B', 'F'].indexOf(v) >= 0) g[h] = v; });
+      (set.homework || []).forEach(function (h) { var v = r.grades && r.grades[h]; if (['A', 'B', 'F', 'N'].indexOf(v) >= 0) g[h] = v; });
       var c = { setId: set.id, studentId: r.studentId, checkedAt: env.now(), grades: g, extra: String(r.extra || '').slice(0, 200) };
       store.putCheck(c); saved.push(c);
     });
@@ -1253,7 +1255,7 @@ function viewForm() {
   if (set.homework.length && F.check && Object.keys(F.check.grades || {}).length) {
     html += '<section class="sheet"><h2>숙제 검사 결과</h2><div class="gradechips">' + set.homework.map(function (hw) {
       var g = F.check.grades[hw] || '–';
-      return '<span class="gchip g-' + g + '"><small>' + h(hw) + '</small><b>' + h(g) + '</b></span>';
+      return '<span class="gchip g-' + g + '"><small>' + h(hw) + '</small><b>' + h(g === 'N' ? '미지참' : g) + '</b></span>';
     }).join('') + '</div></section>';
   }
   if (F.omr) {
@@ -1580,10 +1582,11 @@ function tabWeek() {
   // 숙제
   var cks = (d.checks || []).filter(function (c) { return c.setId === set.id; });
   html += '<section class="block"><h2>숙제 <small>검사 ' + cks.length + '명</small></h2>' + (set.homework.length ? set.homework.map(function (hw) {
-    var c = { A: 0, B: 0, F: 0 }, fs = [];
-    cks.forEach(function (k) { var v = k.grades[hw]; if (c[v] !== undefined) c[v]++; if (v === 'F') fs.push((d.stuById[k.studentId] || {}).name); });
+    var c = { A: 0, B: 0, F: 0, N: 0 }, fs = [], ns = [];
+    cks.forEach(function (k) { var v = k.grades[hw]; if (c[v] !== undefined) c[v]++; if (v === 'F') fs.push((d.stuById[k.studentId] || {}).name); if (v === 'N') ns.push((d.stuById[k.studentId] || {}).name); });
     return '<div class="hwstat"><strong>' + h(hw) + '</strong><span>A ' + c.A + '</span><span>B ' + c.B + '</span><span class="' + (c.F ? 'badtxt' : '') + '">F ' + c.F + '</span>' +
-      (fs.length ? '<small>F: ' + fs.map(h).join(', ') + '</small>' : '') + '</div>';
+      (c.N ? '<span class="badtxt">미지참 ' + c.N + '</span>' : '') +
+      (fs.length ? '<small>F: ' + fs.map(h).join(', ') + '</small>' : '') + (ns.length ? '<small>미지참: ' + ns.map(h).join(', ') + '</small>' : '') + '</div>';
   }).join('') : '<p class="empty">숙제 항목이 없어요.</p>') + '</section></div>';
 
   // 학생별
@@ -1638,8 +1641,8 @@ function termCell(set, st, ctx) {
   else if (absentMk) hwc = { c: 'r', t: exAb === '무단' ? '무단 결석' : '고지 결석' };
   else if (!graded.length) hwc = wait('숙제 검사 기록 없음');
   else {
-    var vs = hw.map(function (x) { return g[x] || ''; }), txt = hw.map(function (x) { return x + ' ' + (g[x] || '-'); }).join(' · ');
-    hwc = { c: vs.indexOf('F') >= 0 ? 'r' : vs.every(function (v) { return v === 'A'; }) ? 'g' : 'o', t: txt };
+    var vs = hw.map(function (x) { return g[x] || ''; }), txt = hw.map(function (x) { return x + ' ' + (g[x] === 'N' ? '미지참' : g[x] || '-'); }).join(' · ');
+    hwc = { c: vs.indexOf('F') >= 0 || vs.indexOf('N') >= 0 ? 'r' : vs.every(function (v) { return v === 'A'; }) ? 'g' : 'o', t: txt };
   }
   if (!items.length) ac = { c: 'x', t: '확인 테스트 없음' };
   else if (!sub) ac = { c: 'x', t: '제출 없음' };
@@ -1684,7 +1687,7 @@ function tabTerm() {
   }).join('') + '</div><input id="in-tq" class="tq" placeholder="이름 또는 초성" value="' + h(A.tq || '') + '" autocomplete="off">' +
     '<label class="inline"><input type="checkbox" id="chk-tach"' + (A.termAch ? ' checked' : '') + '> 성취도 줄</label></div>' +
     '<table class="tlegend"><tr><th>클리닉</th><td><i class="sq g"></i>출석·OMR 제출</td><td><i class="sq o"></i>풀다 말고 제출 · 왔는데 OMR 안 냄</td><td><i class="sq r"></i>결석</td></tr>' +
-    '<tr><th>숙제</th><td><i class="sq g"></i>모두 A</td><td><i class="sq o"></i>B 있음</td><td><i class="sq r"></i>F 있음 · 검사 기록 없음</td></tr>' +
+    '<tr><th>숙제</th><td><i class="sq g"></i>모두 A</td><td><i class="sq o"></i>B 있음</td><td><i class="sq r"></i>F·미지참 있음 · 검사 기록 없음</td></tr>' +
     '<tr><th>성취도</th><td><i class="sq g"></i>그 주 같은 학교 상위 30%</td><td><i class="sq o"></i>중간</td><td><i class="sq r"></i>하위 30%</td></tr>' +
     '<tr><th></th><td><i class="sq n"></i>아직(받는 중인 주) · 등록 전</td><td><i class="sq x">–</i>해당 없음</td><td><i class="sq none">·</i>그 주 세트 없음</td></tr></table>' +
     '<p class="note">칸에 마우스를 올리면 자세한 내용이 보여요. 성취도 칸 숫자는 정답률(%)이고, 색은 그 주 같은 세트를 낸 학생들 안에서의 순위로 정해요(정답률 90% 이상은 빨강으로 안 칠해요). 낸 학생이 5명 미만인 주는 정답률 80% · 60%(무한선지 70% · 50%) 기준이에요. 지난 주차인데 기록이 없으면 빨강이에요.</p>';
@@ -2001,8 +2004,8 @@ function ckRowHtml(st, set) {
     return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
       '<small class="' + (sv === 'err' || sv === 'wait' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'wait' ? '다시 로그인하면 저장돼요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
       '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
-        return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F'].map(function (v) {
-          return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '">' + v + '</button>';
+        return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F', 'N'].map(function (v) {
+          return '<button type="button" class="' + (row[hw] === v ? 'on g' + v : '') + '" data-act="grade" data-set="' + set.id + '" data-st="' + st.id + '" data-hw="' + h(hw) + '" data-v="' + v + '"' + (v === 'N' ? ' title="미지참"' : '') + '>' + (v === 'N' ? '미' : v) + '</button>';
         }).join('') + '</div></div>';
       }).join('') + '<button class="mini" data-act="grade-allA" data-set="' + set.id + '" data-st="' + st.id + '">모두 A</button>' : '<div class="ck-item"><span>클리닉</span><div class="seg"><button type="button" class="' + (extraOf(set.id, st.id) && !absEx(extraOf(set.id, st.id)) ? 'on gA' : '') + '" data-act="came" data-set="' + set.id + '" data-st="' + st.id + '">왔음</button></div></div><span class="muted">숙제 없음</span>') +
       (!set.evalName ? '' : '<div class="ck-item ck-ach"><span>' + h(set.evalName) + '</span><div class="seg">' + ['A+', 'A', 'B', 'C', 'F'].map(function (v) {
@@ -2029,13 +2032,15 @@ function flushChecks() {
     A.dirty[setId] = {};
     var g = gradesFor(setId);
     ids.forEach(function (id) { A.saving[setId + ':' + id] = 'saving'; refreshCkRow(setId, id); });
-    var sent = {}; ids.forEach(function (id) { sent[id] = extraOf(setId, id); });
+    var sent = {}, sentN = {}; ids.forEach(function (id) { sent[id] = extraOf(setId, id); var gi = g[id] || {}; sentN[id] = Object.keys(gi).filter(function (hw) { return gi[hw] === 'N'; }); });
     api('saveChecks', { token: S.token, setId: setId, list: ids.map(function (id) { return { studentId: id, grades: g[id] || {}, extra: sent[id] }; }) }).then(function (r) {
       if (isAuthErr(r)) {
         ids.forEach(function (id) { (A.dirty[setId] || (A.dirty[setId] = {}))[id] = 1; A.saving[setId + ':' + id] = 'wait'; refreshCkRow(setId, id); });
         return;
       }
       ids.forEach(function (id) { A.saving[setId + ':' + id] = r.ok ? 'ok' : 'err'; });
+      if (r.ok && r.saved.some(function (c) { return (sentN[c.studentId] || []).some(function (hw) { return (c.grades || {})[hw] !== 'N'; }); }))
+        toast('서버(앱스 스크립트)가 예전 버전이라 \'미지참\'이 저장되지 않았어요. 새 omr 파일(v16)을 올리고 새 버전으로 배포해 주세요.', true);
       if (r.ok && r.saved.some(function (c) { return sent[c.studentId] && c.extra !== sent[c.studentId]; }))
         toast('서버(앱스 스크립트)가 예전 버전이라 \'왔음\'과 추가 평가가 저장되지 않았어요. 새 omr 파일(v12)을 올리고 새 버전으로 배포해 주세요.', true);
       if (r.ok) {
@@ -2073,7 +2078,7 @@ function resultRowsForDay(day, school) {
     return { extra: ck ? (ck.extra || '') : '', set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, pct: sub && n ? subCredit(items, sub) / n : null, partial: setPartial(items), guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks, blankNos(items, sub), creditMap(items, sub)) : [], blank: sub ? Object.keys(blankNos(items, sub)).length : 0 };
   }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
 }
-var MARK = { A: '○', B: '△', F: '✕' };
+var MARK = { A: '○', B: '△', F: '✕', N: '미지참' };
 function fullSchool(sc) { return sc === '경복' ? '경복여고' : /고$/.test(sc) ? sc : sc + '고'; }
 function getNote(set) { return set.note || ''; }
 var noteTimer = {};
@@ -2381,7 +2386,7 @@ function tabToday() {
   html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th>약한 유형</th></tr></thead><tbody>' +
     rows.map(function (r) {
       return '<tr><td><button class="link" data-act="detail" data-id="' + r.st.id + '">' + h(r.st.name) + '</button></td><td class="muted">' + h(r.st.school + ' · ' + r.set.week) + '</td>' +
-        '<td class="num">' + (!r.set.homework.length ? '<span class="muted">없음</span>' : r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + '">' + (MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
+        '<td class="num">' + (!r.set.homework.length ? '<span class="muted">없음</span>' : r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + (v === 'N' ? ' 미지참' : '') + '">' + (v === 'N' ? '미' : MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
         '<td class="r num">' + (!r.n ? '<span class="muted">입력 없음</span>' : r.sub ? (r.partial ? pct(r.pct) + ' <small class="muted">완벽 ' + r.score + '/' + r.n + '</small>' : r.score + '/' + r.n) + (r.blank ? ' <small class="muted">안 푼 ' + r.blank + '</small>' : '') : '<span class="badtxt">미제출</span>') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + (r.sub ? r.guess : '') + '</td>' : '') +
         '<td>' + h(gradeOnly(r.extra)) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td></tr>';
     }).join('') + '</tbody></table></div>';
