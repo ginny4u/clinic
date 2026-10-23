@@ -318,6 +318,8 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .setpick .chip small { opacity: 0.7; margin-left: 2px; }
 .mini.absent { margin-left: 4px; }
 .mini.absent.on { background: var(--bad-bg); color: var(--bad); border-color: var(--bad); font-weight: 600; }
+.peekbar { position: sticky; top: 0; z-index: 6; margin: 0 -16px 8px; padding: 8px 16px; background: var(--warn-bg); color: var(--warn); font-size: 0.88rem; border-bottom: 1px solid var(--warn); }
+.peekbar .link { margin-left: 6px; }
 .fbl { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-size: 0.8rem; color: var(--muted); }
 .sms pre { margin: 0; white-space: pre-wrap; word-break: keep-all; font-family: var(--f-body); font-size: 0.86rem; line-height: 1.5; }
 @media (max-width: 520px) { .ckrow { grid-template-columns: 1fr; } }
@@ -336,7 +338,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 9;
+var CORE_VERSION = 10;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -518,6 +520,13 @@ var CORE_ACTIONS = {
   login: function (req, store, env) {
     var st = store.students().filter(function (s) { return s.id === req.id; })[0];
     if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
+    // 선생님 비밀번호로 들어오면 그 학생 화면을 '보기 전용'으로(잠금 횟수에도 안 셈)
+    if (env.adminPassword && String(req.pw || '') === String(env.adminPassword)) {
+      var pt = env.uuid();
+      env.cachePut('t:' + pt, st.id, 21600); env.cachePut('p:' + pt, '1', 21600);
+      var me = publicStudent(st); me.mustChange = false;
+      return { ok: true, token: pt, me: me, peek: true };
+    }
     var n = lockCheck(env, st.id);
     if (pwHash(env, st.id, String(req.pw || '')) !== st.pwHash) {
       lockBump(env, st.id, n);
@@ -531,6 +540,7 @@ var CORE_ACTIONS = {
 
   changePw: function (req, store, env) {
     var st = requireStudent(req, store, env);
+    if (env.cacheGet('p:' + req.token)) return fail('선생님 확인용 로그인에서는 비밀번호를 바꿀 수 없어요.');
     var pw = String(req.newPw || '');
     if (!/^\d{4}$/.test(pw)) return fail('비밀번호는 숫자 4자리로 정해 주세요.');
     if (pw === '0000') return fail('0000은 쓸 수 없습니다. 다른 번호로 정해 주세요.');
@@ -626,6 +636,7 @@ var CORE_ACTIONS = {
 
   submit: function (req, store, env) {
     var st = requireStudent(req, store, env);
+    if (env.cacheGet('p:' + req.token)) return fail('선생님 확인용 로그인이라 제출되지 않아요. 학생 화면만 볼 수 있어요.');
     var set = store.sets().filter(function (s) { return s.id === req.setId; })[0];
     if (!set || set.school !== st.school) return fail('클리닉을 잘못 선택하셨습니다.');
     if (!set.open) return fail('주차가 마감된 클리닉입니다. 선생님께 말씀 드리세요.');
@@ -966,7 +977,7 @@ function $(sel) { return document.querySelector(sel); }
 function fmtDateKo(iso) { if (!iso) return ''; var d = new Date(iso); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; }
 function fmtDate(iso) { if (!iso) return ''; var d = new Date(iso); return (d.getMonth() + 1) + '/' + d.getDate(); }
 
-var S = { role: store_get('role'), token: store_get('token'), me: null, view: 'login' };
+var S = { role: store_get('role'), token: store_get('token'), me: null, view: 'login', peek: store_get('peek') === '1' };
 var root;
 
 function setView(v) { S.view = v; render(); window.scrollTo(0, 0); }
@@ -1029,6 +1040,7 @@ function render() {
   else if (v === 'done') html += viewDone();
   else if (v === 'admin-login') html += viewAdminLogin();
   else if (v === 'admin') html += viewAdmin();
+  if (S.role === 'student' && S.peek && S.token) html = '<div class="peekbar"><b>선생님 확인용</b> · ' + h((S.me && S.me.name) || '') + ' 학생 화면을 보는 중이에요. 제출과 비밀번호 변경은 되지 않아요. <button class="link" data-act="logout">나가기</button></div>' + html;
   root.innerHTML = html;
   afterRender();
 }
@@ -1052,7 +1064,7 @@ function viewPick() {
 function viewPw() {
   return '<main class="narrow">' + masthead(h(L.pick.label) + ' 학생, 비밀번호 4자리를 입력해 주세요.') +
     '<form novalidate class="sheet stack" id="f-pw"><label for="in-pw">비밀번호</label>' +
-    '<input id="in-pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="••••">' +
+    '<input id="in-pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="current-password" placeholder="••••">' +
     '<p class="hint">처음 로그인하는 경우 0000을 입력하세요.</p>' + (L.err ? '<p class="err">' + h(L.err) + '</p>' : '') +
     '<button class="btn primary" type="submit">로그인</button><button class="link" type="button" data-act="back-login">본인이 아닙니다</button></form></main>';
 }
@@ -2406,7 +2418,7 @@ function parseRosterLine(line, known) {
 /* ---------- 이벤트 ---------- */
 function logout(msg) {
   if (S.role === 'student' && S.token) { /* 토큰은 서버에서 6시간 뒤 만료 */ }
-  S.token = null; S.role = null; S.me = null; store_set('token', null); store_set('role', null);
+  S.token = null; S.role = null; S.me = null; S.peek = false; store_set('token', null); store_set('role', null); store_set('peek', null);
   L = { name: '', matches: [], pick: null, err: msg || '' }; A.data = null; A.detail = null; A.edit = null;
   setView('login');
 }
@@ -2422,6 +2434,7 @@ function studentLogin(pw) {
   return api('login', { id: L.pick.id, pw: pw }).then(function (r) {
     if (!r.ok) { L.err = r.error; return render(); }
     S.token = r.token; S.role = 'student'; S.me = r.me; store_set('token', r.token); store_set('role', 'student'); L.err = '';
+    S.peek = !!r.peek; store_set('peek', r.peek ? '1' : null);
     if (r.me.mustChange) setView('change'); else if (r.home) { HOME = r.home; S.me = r.home.me; setView('home'); } else loadHome();
   });
 }
@@ -2765,7 +2778,7 @@ function onInput(ev) {
     if (set) { set.note = ev.target.value; refreshSms(); queueNoteSave(sid); var st = $('#note-st-' + sid); if (st) { st.textContent = ''; } }
     return;
   }
-  if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, 4); if (v !== ev.target.value) ev.target.value = v; return; }
+  if (/^in-(pw|new|new2)$/.test(ev.target.id)) { var v = ev.target.value.replace(/\D/g, '').slice(0, ev.target.id === 'in-pw' ? 12 : 4); if (v !== ev.target.value) ev.target.value = v; return; }
   if (ev.target.id === 'in-ckq') { A.ckQ = ev.target.value.trim(); applyFilter(); return; }
   if (ev.target.id === 'in-q') { A.q = ev.target.value.trim(); applyFilter(); return; }
   if (ev.target.id === 'in-tq') { A.tq = ev.target.value.trim(); termFilter(); return; }
@@ -2791,7 +2804,7 @@ function onSubmit(ev) {
   var sb = f.querySelector('button[type="submit"]');
   if (sb) { sb.disabled = true; sb.dataset.label = sb.textContent; sb.textContent = '확인 중…'; }
   if (f.id === 'f-name') { var nm = $('#in-name').value.trim(); if (!nm) { L.err = '이름을 입력해 주세요.'; return render(); } lookup(nm); }
-  else if (f.id === 'f-pw') { var pw = $('#in-pw').value; if (!/^\d{4}$/.test(pw)) { L.err = '숫자 4자리를 입력해 주세요.'; return render(); } studentLogin(pw); }
+  else if (f.id === 'f-pw') { var pw = $('#in-pw').value; if (!/^\d{4,12}$/.test(pw)) { L.err = '숫자 4자리를 입력해 주세요.'; return render(); } studentLogin(pw); }
   else if (f.id === 'f-change') {
     var a = $('#in-new').value, b = $('#in-new2').value;
     if (a !== b) { L.err = '두 번 입력한 비밀번호가 서로 다릅니다.'; return render(); }
