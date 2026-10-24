@@ -918,7 +918,8 @@ function resultBm() {
   var pd = ''; try { pd = String($('#txt_yyyymmdd').val() || ''); } catch (x) { pd = ''; }
   if (e.d && /^\d{4}-\d{2}-\d{2}$/.test(pd) && pd !== e.d && !confirm('맥가이 화면 날짜(' + kd(pd) + ')와 트래커에서 고른 날짜(' + kd(e.d) + ')가 다릅니다.\n그래도 넣을까요?')) return;
   var want = {};
-  e.rows.forEach(function (r) { var sc = sk(r.s); if (!/고$/.test(sc)) sc += '고'; want[nk(r.n) + '|' + sc] = { n: String(r.n), s: sc, m: String(r.m), a: !!r.a }; });
+  e.rows.forEach(function (r) { var sc = sk(r.s); if (!/고$/.test(sc)) sc += '고'; want[nk(r.n) + '|' + sc] = { n: String(r.n), s: sc, m: String(r.m), a: !!r.a, t: /^\d{2}:\d{2}$/.test(String(r.t || '')) ? String(r.t) : '' }; });
+  var tm = function (w) { return w.a ? '15:00' : (w.t || '15:00'); };
   var CK = 'clinicTrkStu', cache = {};
   try { cache = JSON.parse(localStorage.getItem(CK) || '{}') || {}; } catch (x) { cache = {}; }
   var remember = function (M) { if (M && M.M_IDX && M.M_NAME) cache[nk(M.M_NAME) + '|' + sk(M.M_SCHOOL)] = [String(M.M_IDX), String(M.M_NAME), String(M.M_SCHOOL || ''), String(M.M_GRADE_NAME || ''), Date.now()]; };
@@ -932,7 +933,7 @@ function resultBm() {
     var key = nk(M.M_NAME) + '|' + sk(M.M_SCHOOL), w = want[key];
     if (!w) continue;
     delete want[key];
-    if (w.a && M.status === 'I' && !String(M.IN_TIME || '').trim()) put(o, 'IN_TIME', '15:00');
+    if (M.status === 'I' && !String(M.IN_TIME || '').trim()) put(o, 'IN_TIME', tm(w));
     var cur = String(M.CC_MEMO || '').trim();
     if (cur !== '' && cur !== w.m.trim()) {
       if (over === null) over = confirm('이미 평가가 적혀 있는 학생이 있습니다. 덮어쓸까요?\n(취소를 누르면 그 학생들은 건너뜁니다)');
@@ -942,16 +943,16 @@ function resultBm() {
   }
   keep();
   var rest = Object.keys(want).map(function (k) { return want[k]; });
-  var abs = rest.filter(function (w) { return w.a && onList[nk(w.n)] === undefined; });
-  var same = rest.filter(function (w) { return w.a && onList[nk(w.n)] !== undefined; });
-  var notOn = rest.filter(function (w) { return !w.a; });
+  var abs = rest.filter(function (w) { return onList[nk(w.n)] === undefined; });
+  var same = rest.filter(function (w) { return onList[nk(w.n)] !== undefined; });
+  var notOn = [];
   var added = [], failed = [], nm = function (w) { return w.n; };
   var report = function () {
     keep();
     var L = ['평가를 채운 학생: ' + (done.length + added.length) + '명'];
-    if (added.length) L.push('줄을 추가한 결석생(등원 15:00): ' + added.join(', '));
-    if (failed.length) L.push('줄을 추가하지 못한 결석생: ' + failed.join(', '));
-    if (same.length) L.push('같은 이름이 목록에 있어서 추가하지 않은 결석생: ' + same.map(function (w) { return w.n + '(트래커 ' + w.s + ' / 맥가이 ' + (onList[nk(w.n)] || '학교 없음') + ')'; }).join(', '));
+    if (added.length) L.push('줄을 추가한 학생: ' + added.join(', '));
+    if (failed.length) L.push('줄을 추가하지 못한 학생: ' + failed.join(', '));
+    if (same.length) L.push('같은 이름이 목록에 있어서 추가하지 않은 학생: ' + same.map(function (w) { return w.n + '(트래커 ' + w.s + ' / 맥가이 ' + (onList[nk(w.n)] || '학교 없음') + ')'; }).join(', '));
     if (skipped.length) L.push('이미 적혀 있어서 건너뜀: ' + skipped.join(', '));
     if (notOn.length) L.push('이 화면 목록에 없는 학생: ' + notOn.map(nm).join(', '));
     alert(L.join('\n') + '\n\n내용을 확인한 뒤 저장 버튼을 눌러 주세요.');
@@ -959,7 +960,11 @@ function resultBm() {
   if (!abs.length) { report(); return; }
   if (typeof fn_Add !== 'function' || typeof select_student !== 'function' || typeof dsLST1.CancelRow !== 'function') { notOn = notOn.concat(abs); report(); return; }
   if (typeof CUR_TAB_ID !== 'undefined' && CUR_TAB_ID !== 'infotab_1') { failed = abs.map(function (w) { return w.n + '(출석입력 탭에서 다시 눌러 주세요)'; }); report(); return; }
-  if (!confirm('이 화면 목록에 없는 결석생 ' + abs.length + '명: ' + abs.map(nm).join(', ') + '\n\n줄을 추가하고 결석 문자를 넣을까요?\n(등원 15:00, 하원은 비워 둡니다. 저장은 직접 눌러 주세요.)')) { notOn = notOn.concat(abs); report(); return; }
+  var abY = abs.filter(function (w) { return w.a; }), abN = abs.filter(function (w) { return !w.a; });
+  if (!confirm('이 화면 목록에 없는 학생 ' + abs.length + '명\n' +
+    (abN.length ? '· 출석: ' + abN.map(function (w) { return w.n + '(' + tm(w) + ')'; }).join(', ') + '\n' : '') +
+    (abY.length ? '· 결석: ' + abY.map(nm).join(', ') + '\n' : '') +
+    '\n줄을 추가하고 평가를 넣을까요?\n(등원: 출석한 학생은 그날 트래커에 처음 기록된 시각, 결석생은 15:00. 하원은 비워 둡니다. 저장은 직접 눌러 주세요.)')) { notOn = notOn.concat(abs); report(); return; }
   var orig = window.select_student, curRow = null;
   window.select_student = function () { if (curRow === null) return; dsLST1.RowPosition = curRow; return orig.apply(this, arguments); };
   var bar = document.createElement('div');
@@ -980,9 +985,9 @@ function resultBm() {
       var M = dsLST1[r];
       if (nk(M.M_NAME) !== nk(w.n)) { drop('다른 학생이 선택됨'); return; }
       if (sk(M.M_SCHOOL) !== w.s) { drop('맥가이 학교: ' + (M.M_SCHOOL || '없음')); return; }
-      put(r, 'IN_TIME', '15:00'); memo(r, w.m); remember(M); added.push(M.M_NAME); end();
+      put(r, 'IN_TIME', tm(w)); memo(r, w.m); remember(M); added.push(M.M_NAME + '(' + (w.a ? '결석 ' : '') + tm(w) + ')'); end();
     };
-    bar.innerHTML = '<b>결석생 줄 추가 중 (' + i + '/' + abs.length + ')</b><br>' + esc(w.n) + ' · ' + esc(w.s) +
+    bar.innerHTML = '<b>학생 줄 추가 중 (' + i + '/' + abs.length + ')</b><br>' + esc(w.n) + ' · ' + esc(w.s) +
       '<br><span style="color:#555">같은 이름 학생이 여럿이면 검색 창이 떠요. 학교를 확인하고 골라 주세요.</span>' +
       '<div style="margin-top:6px"><button type="button" style="padding:3px 10px;cursor:pointer">이 학생은 건너뛰기</button></div>';
     bar.querySelector('button').onclick = function () { if (picker()) { alert('검색 창을 먼저 닫아 주세요.'); return; } drop('건너뜀'); };
@@ -1658,7 +1663,8 @@ function termCell(set, st, ctx) {
   var g = gradesFor(set.id)[st.id] || {}, hw = set.homework || [];
   var exAb = extraOf(set.id, st.id), graded = hw.filter(function (x) { return g[x]; }), absentMk = !graded.length && absEx(exAb), came = graded.length > 0 || (!!exAb && !absEx(exAb));
   var end = ctx.end[set.id], done = set.open === false || !!end;
-  var pre = !!(st.joinedAt && end && String(st.joinedAt) >= String(end));
+  var cutT = ctx.cut && ctx.cut[set.id] !== undefined ? ctx.cut[set.id] : setCutoff(set, d.subs.filter(function (x) { return x.setId === set.id; }));
+  var pre = !sub && !!st.joinedAt && ((!!end && String(st.joinedAt) >= String(end)) || (!!cutT && String(st.joinedAt) > String(cutT)));
   var wait = function (t) { return pre ? { c: 'n', t: '등록 전' } : done ? { c: 'r', t: t } : { c: 'n', t: '아직' }; };
   var cl, hwc, ac;
   if (sub && items.length) {
@@ -1703,7 +1709,8 @@ function tabTerm() {
     var ss = d.sets.filter(function (s) { return s.school === sc; }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
     ss.forEach(function (s, i) { var k = termKey(s.week); if (k !== null) ((by[sc] || (by[sc] = {}))[k] || (by[sc][k] = [])).push(s); end[s.id] = ss[i + 1] ? ss[i + 1].createdAt : null; });
   });
-  var ctx = { sub: {}, end: end, accs: {} };
+  var ctx = { sub: {}, end: end, accs: {}, cut: {} };
+  d.sets.forEach(function (s) { ctx.cut[s.id] = setCutoff(s, d.subs.filter(function (x) { return x.setId === s.id; })); });
   d.subs.forEach(function (s) {
     ctx.sub[s.setId + '|' + s.studentId] = s;
     var its = d.items[s.setId] || []; if (its.length) (ctx.accs[s.setId] || (ctx.accs[s.setId] = [])).push(subCredit(its, s) / its.length);
@@ -2365,6 +2372,15 @@ function fbBox(r, i) {
       }).join('') + '</div></div>';
     }).join('');
 }
+// 그날 트래커에 처음 남은 기록 시각(숙제 검사·OMR 제출 중 이른 쪽) → 맥가이 줄을 새로 만들 때 등원 시각
+function rowTime(r) {
+  var day = A.day || todayStr(), ts = [];
+  if (r.ck && ckCame(r.ck) && !absEx(r.ck.extra)) ts.push(String(r.ck.checkedAt || ''));
+  if (r.sub) ts.push(String(r.sub.submittedAt || ''));
+  ts = ts.filter(function (x) { return x && localDay(x) === day; }).sort();
+  if (!ts.length) return '';
+  var dt = new Date(ts[0]); return ('0' + dt.getHours()).slice(-2) + ':' + ('0' + dt.getMinutes()).slice(-2);
+}
 function rowAbsent(r) { return absEx(r.extra) && !(r.ck && Object.keys(r.ck.grades || {}).length) && !r.sub; }
 function smsText(r) {
   var exam = A.exam || '기말고사';
@@ -2410,7 +2426,7 @@ function tabToday() {
     }).join('') + '</section>';
   html += '<section class="sheet stack"><h2>학원관리시스템에 한 번에 넣기</h2>' +
     '<ol class="steps"><li>아래 <b>학원관리시스템용 복사</b>를 눌러 주세요.</li><li>학원관리시스템 클리닉수업관리 화면에서 북마크 바의 <b>클리닉 결과 넣기</b>를 눌러 주세요.</li>' +
-    '<li>뜨는 칸에 Ctrl + V로 붙여 넣고 확인을 눌러 주세요. 맥가이 목록에 없는 결석생이 있으면 줄을 추가할지 물어봐요(등원 15:00, 하원 비움).</li>' +
+    '<li>뜨는 칸에 Ctrl + V로 붙여 넣고 확인을 눌러 주세요. 맥가이 목록에 없는 학생이 있으면 줄을 추가할지 물어봐요(등원: 출석한 학생은 트래커 첫 기록 시각, 결석생은 15:00 · 하원 비움).</li>' +
     '<li>평가 칸이 채워지면 내용을 확인하고 <b>저장</b>을 눌러 주세요.</li></ol>' +
     '<div class="actions"><button class="btn" data-act="copy-all">문자 문구만 전체 복사</button><button class="btn primary" data-act="copy-acad">학원관리시스템용 복사</button></div>' +
     '<details><summary>"클리닉 결과 넣기" 북마크 만들기 · 새로 바꾸기</summary>' +
@@ -2723,7 +2739,7 @@ function onClick(ev) {
   if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) { var k8 = fbKey(r8); delete A.fbEdit[k8]; store_set('fb.' + k8, null); } return renderKeep(); }
   if (act === 'copy-sms') { var i = Number(t.dataset.i); copyText(smsText(A.todayRows[i]), $('#sms-' + i)); return; }
   if (act === 'copy-acad') {
-    copyText(JSON.stringify({ v: 1, d: A.day || todayStr(), rows: A.todayRows.map(function (r) { var o = { n: r.st.name, s: fullSchool(r.st.school), m: smsText(r) }; if (rowAbsent(r)) o.a = 1; return o; }) }), null);
+    copyText(JSON.stringify({ v: 1, d: A.day || todayStr(), rows: A.todayRows.map(function (r) { var o = { n: r.st.name, s: fullSchool(r.st.school), m: smsText(r) }; if (rowAbsent(r)) o.a = 1; else { var tt = rowTime(r); if (tt) o.t = tt; } return o; }) }), null);
     return;
   }
   if (act === 'copy-bm') { copyText(BOOKMARKLET_HREF, null); return; }
