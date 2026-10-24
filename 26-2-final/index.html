@@ -1663,7 +1663,7 @@ function termCell(set, st, ctx) {
   var g = gradesFor(set.id)[st.id] || {}, hw = set.homework || [];
   var exAb = extraOf(set.id, st.id), graded = hw.filter(function (x) { return g[x]; }), absentMk = !graded.length && absEx(exAb), came = graded.length > 0 || (!!exAb && !absEx(exAb));
   var end = ctx.end[set.id], done = set.open === false || !!end;
-  var cutT = ctx.cut && ctx.cut[set.id] !== undefined ? ctx.cut[set.id] : setCutoff(set, d.subs.filter(function (x) { return x.setId === set.id; }));
+  var cutT = ctx.start ? (ctx.start[set.id] !== undefined ? ctx.start[set.id] : (ctx.start[set.id] = setStartAt(set.id))) : setStartAt(set.id);
   var pre = !sub && !!st.joinedAt && ((!!end && String(st.joinedAt) >= String(end)) || (!!cutT && String(st.joinedAt) > String(cutT)));
   var wait = function (t) { return pre ? { c: 'n', t: '등록 전' } : done ? { c: 'r', t: t } : { c: 'n', t: '아직' }; };
   var cl, hwc, ac;
@@ -1709,8 +1709,7 @@ function tabTerm() {
     var ss = d.sets.filter(function (s) { return s.school === sc; }).sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
     ss.forEach(function (s, i) { var k = termKey(s.week); if (k !== null) ((by[sc] || (by[sc] = {}))[k] || (by[sc][k] = [])).push(s); end[s.id] = ss[i + 1] ? ss[i + 1].createdAt : null; });
   });
-  var ctx = { sub: {}, end: end, accs: {}, cut: {} };
-  d.sets.forEach(function (s) { ctx.cut[s.id] = setCutoff(s, d.subs.filter(function (x) { return x.setId === s.id; })); });
+  var ctx = { sub: {}, end: end, accs: {}, start: {} };
   d.subs.forEach(function (s) {
     ctx.sub[s.setId + '|' + s.studentId] = s;
     var its = d.items[s.setId] || []; if (its.length) (ctx.accs[s.setId] || (ctx.accs[s.setId] = [])).push(subCredit(its, s) / its.length);
@@ -1936,6 +1935,20 @@ function attBox(am) {
 }
 // 0: 출석했는데 체크 전, 1: (출석 명단에 없고) 체크 전, 2: 오늘 체크함, 3: 어제 이전에 체크함, 4: 전에 체크했는데 오늘 또 출석
 // (체크 = 숙제·왔음·추가 평가 중 하나라도. 오늘 = 서버에 저장된 시각이 오늘이거나 이 화면에서 방금 누른 것)
+// 그 세트의 클리닉이 처음 시작된 때: 첫 OMR 제출과 첫 숙제 검사 중 이른 쪽(아직 아무 기록 없으면 '')
+function setStartAt(setId) {
+  var t = '';
+  (A.data.subs || []).forEach(function (s) { if (s.setId === setId && s.submittedAt && (!t || String(s.submittedAt) < t)) t = String(s.submittedAt); });
+  (A.data.checks || []).forEach(function (c) { if (c.setId === setId && ckCame(c) && c.checkedAt && (!t || String(c.checkedAt) < t)) t = String(c.checkedAt); });
+  return t;
+}
+// 클리닉이 시작된 뒤 들어온 신규생(그 세트에 제출·검사 기록 없음)
+function ckNewcomer(setId, sid) {
+  var st = A.data.stuById[sid]; if (!st || !st.joinedAt) return false;
+  if ((A.data.subs || []).some(function (s) { return s.setId === setId && s.studentId === sid; })) return false;
+  var t = setStartAt(setId);
+  return !!t && String(st.joinedAt) > t;
+}
 function ckGroup(setId, sid) {
   var g = gradesFor(setId)[sid] || {};
   if (!Object.keys(g).length && absEx(extraOf(setId, sid))) {
@@ -1950,16 +1963,16 @@ function ckGroup(setId, sid) {
     if (!c || localDay(c.checkedAt) === todayStr()) return 2;
     return A.attIds && A.attIds[sid] ? 4 : 3;
   }
-  return A.attIds && A.attIds[sid] ? 0 : 1;
+  return A.attIds && A.attIds[sid] ? 0 : ckNewcomer(setId, sid) ? 7 : 1;
 }
 function ckDivHtml(grp) {
-  var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생 · 출석' : grp === 4 ? '오늘 또 온 학생 (이번 주 체크는 끝남)' : grp === 5 ? '오늘 체크한 학생 · 결석' : grp === 6 ? '전에 결석 처리한 학생' : '전에 체크한 학생';
+  var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생 · 출석' : grp === 4 ? '오늘 또 온 학생 (이번 주 체크는 끝남)' : grp === 5 ? '오늘 체크한 학생 · 결석' : grp === 6 ? '전에 결석 처리한 학생' : grp === 7 ? '이번 주 클리닉이 시작된 뒤 등록한 학생 (다음 세트부터)' : '전에 체크한 학생';
   return '<div class="ck-div" data-grp="' + grp + '"><span>' + t + '</span> <span class="ck-cnt"></span></div>';
 }
 // 출석을 가져왔으면 출석·체크 전 → 또 온 학생 → 오늘 체크 → 출석 명단에 없는 학생 → 전에 체크, 아니면 체크 전 → 오늘 체크 → 전에 체크
 // 출석 가져옴: 출석·체크 전 → 또 온 학생 → 오늘 출석 → 오늘 결석 → 출석 명단에 없음 → 전에 체크 → 전에 결석
 // 안 가져옴: 체크 전 → 오늘 출석 → 오늘 결석 → 전에 체크 → 전에 결석
-function ckRank(g) { return A.attN ? [0, 4, 2, 5, 1, 3, 6][g] : [0, 1, 2, 4, 6, 3, 5][g]; }
+function ckRank(g) { return A.attN ? [0, 4, 2, 5, 1, 3, 6, 7][g] : [0, 1, 2, 4, 6, 3, 5, 7][g]; }
 function ckCmp(a, b) { return ckRank(a.g) - ckRank(b.g) || ((a.g === 5 || a.g === 6) ? (a.ab || 0) - (b.ab || 0) : 0) || a.name.localeCompare(b.name); }
 // 지금 화면 순서가 체크 상태와 어긋났는지 보고 '정리' 버튼·남은 인원을 갱신
 function ckMark() {
