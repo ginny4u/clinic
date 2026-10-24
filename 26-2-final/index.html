@@ -2996,7 +2996,22 @@ function afterRender() {
 var A2HS = { evt: null, done: false, help: false, mode: /(?:^|&)parent(?:[=&]|$)/.test(location.search.slice(1)) ? 'parent' : 'student' };
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); A2HS.evt = e; a2hsRefresh(); });
 window.addEventListener('appinstalled', function () { A2HS.done = true; a2hsRefresh(); });
-function a2hsStandalone() { try { return (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; } catch (e) { return false; } }
+// 앱(홈 화면 아이콘)으로 연 화면인지: 앱 창 모드, 아이폰 웹 앱, 또는 주소에 ?app(앱 시작 주소·추가할 때 붙여 둔 표시). 페이지를 열 때 한 번만 봄
+A2HS.app = (function () {
+  try {
+    if (/(?:^|&)app(?:[=&]|$)/.test(location.search.slice(1)) || navigator.standalone === true) return true;
+    var mm = window.matchMedia;
+    return !!mm && ['standalone', 'fullscreen', 'minimal-ui', 'window-controls-overlay'].some(function (m) { return mm('(display-mode: ' + m + ')').matches; });
+  } catch (e) { return false; }
+})();
+function a2hsStandalone() { return A2HS.app; }
+// 추가하기를 누르면 주소에 ?app을 붙여 둠 → 메뉴·공유로 추가한 아이콘도 앱으로 알아봄
+function a2hsMarkUrl() {
+  try {
+    if (/(?:^|&)app(?:[=&]|$)/.test(location.search.slice(1))) return;
+    history.replaceState(history.state, '', location.pathname + (location.search ? location.search + '&app' : '?app') + location.hash);
+  } catch (e) {}
+}
 function a2hsEnv() {
   var ua = navigator.userAgent || '';
   if (/KAKAOTALK/i.test(ua)) return 'kakao';
@@ -3015,6 +3030,8 @@ function a2hsHelp(env) {
 // 로그인 뒤 화면에 넣는 띠. 이미 앱으로 열었거나, 닫았거나, 컴퓨터에서 설치 창을 띄울 수 없으면 비움
 function a2hsHtml() {
   if (a2hsStandalone() || A2HS.done || store_get('a2hs-hide-' + A2HS.mode) === '1') return '';
+  var seen = Number(store_get('a2hs-seen-' + A2HS.mode) || 0);   // 추가 방법을 본 뒤 30분이 지나 다시 열면(이미 추가했을 테니) 띄우지 않음
+  if (seen && Date.now() - seen > 30 * 60 * 1000) return '';
   var env = a2hsEnv();
   if (env === 'desktop' && !A2HS.evt) return '';
   return '<div class="a2hs ' + A2HS.mode + '" id="a2hs"><div class="a2hs-t"><b>홈 화면에 추가</b><span>앱처럼 바로 열 수 있어요.</span></div>' +
@@ -3028,12 +3045,15 @@ document.addEventListener('click', function (ev) {
   if (t.dataset.a2hs === 'close') { store_set('a2hs-hide-' + A2HS.mode, '1'); a2hsRefresh(); return; }
   if (A2HS.evt) {
     var e = A2HS.evt; A2HS.evt = null;
+    store_set('a2hs-seen-' + A2HS.mode, String(Date.now()));
     e.prompt();
     (e.userChoice || Promise.resolve({})).then(function (c) { if (c && c.outcome === 'accepted') A2HS.done = true; a2hsRefresh(); });
     return;
   }
   if (a2hsEnv() === 'kakao') { location.href = a2hsKakaoUrl(); return; }
-  A2HS.help = !A2HS.help; a2hsRefresh();
+  A2HS.help = !A2HS.help;
+  if (A2HS.help) { a2hsMarkUrl(); store_set('a2hs-seen-' + A2HS.mode, String(Date.now())); }
+  a2hsRefresh();
 });
 if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
   window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
