@@ -1209,7 +1209,7 @@ function viewHome() {
   var entries = HOME.history.map(function (x) { return { items: HOME.items[x.setId] || [], marks: x.marks, setId: x.setId, skip: toSkip(x.blank), credit: x.credit }; });
   var st = calc(entries);
   var html = '<main>' + masthead(h(me.school) + ' · ' + h(me.name) + ' <button class="link" data-act="logout">로그아웃</button>', 'sm');
-  if (!S.peek) html += '<div id="a2hs-slot">' + a2hsHtml() + '</div>';
+  html += '<div id="a2hs-slot">' + a2hsHtml() + '</div>';   // 선생님 확인용으로 들어와도 학생이 보는 그대로
   html += '<section class="block"><h2>이번 주</h2>';
   if (!open.length) html += '<p class="empty">지금 제출할 수 있는 클리닉이 없습니다.</p>';
   html += '<div class="cards">' + open.map(function (s) {
