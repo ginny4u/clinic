@@ -334,6 +334,116 @@ table.tlegend { width: fit-content; align-self: flex-start; }
 .absbtns { margin-left: auto; display: inline-flex; gap: 4px; }
 .mini.absent.notice.on { background: var(--warn-bg); color: var(--warn); border-color: var(--warn); font-weight: 600; }
 
+/* ===== 학부모 리포트 ===== */
+body.parent { background: #F3F5F9; color: #182033; padding: 0; }
+body.parent #app { padding: 0; }
+body.parent .busybar { background: #2557E0; }
+.pr { max-width: 430px; margin: 0 auto; font-family: 'Noto Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; color: #182033; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; line-height: normal; }
+.pr *, .pr *::before, .pr *::after { box-sizing: border-box; }
+.pr-card { background: #F3F5F9; display: flex; flex-direction: column; }
+.pr-head { background: #2557E0; color: #FFFFFF; padding: 28px 20px 26px; display: flex; flex-direction: column; gap: 6px; }
+.pr-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pr-k { font-size: 13px; font-weight: 500; letter-spacing: 0.02em; }
+.pr-pill { font-size: 12px; font-weight: 500; border: 1px solid #FFFFFF; border-radius: 999px; padding: 3px 10px; white-space: nowrap; }
+.pr-title { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.pr-h1 { margin: 0; font-family: 'Jua', sans-serif; font-weight: 400; font-size: 32px; line-height: 1.2; color: #FFFFFF; }
+.pr-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #2557E0; background: #FFFFFF; border-radius: 999px; padding: 4px 10px; white-space: nowrap; }
+.pr-sub { margin: 0; font-size: 14px; color: #FFFFFF; }
+.pr-main { padding: 16px 16px 0; display: flex; flex-direction: column; gap: 14px; }
+.pr-sec { background: #FFFFFF; border: 1px solid #E1E6EF; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; }
+.pr-sec h2 { margin: 0; font-size: 17px; font-weight: 700; color: #182033; font-family: inherit; }
+.pr-big { font-family: 'Jua', sans-serif; font-size: 60px; line-height: 1; color: #2557E0; white-space: nowrap; }
+.pr-big.gray { color: #6B778C; margin-top: 14px; }
+.pr-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; column-gap: 8px; row-gap: 10px; margin-top: 14px; }
+.pr-up { flex: none; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 700; color: #2557E0; background: #EAF0FD; border-radius: 999px; padding: 6px 12px; margin-bottom: 6px; white-space: nowrap; }
+.pr-down { flex: none; font-size: 13px; font-weight: 500; color: #5B6577; background: #EEF1F6; border-radius: 999px; padding: 6px 12px; margin-bottom: 6px; white-space: nowrap; }
+.pr-p { margin: 12px 0 0; font-size: 14px; line-height: 1.6; color: #5B6577; }
+.pr-small { margin: 8px 0 0; font-size: 13px; color: #5B6577; }
+.pr-part { margin-top: 18px; background: #FDEDE3; border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+.pr-part b { font-size: 14px; font-weight: 700; color: #B8430F; }
+.pr-part span { font-size: 13px; line-height: 1.6; }
+.pr-part small { font-size: 12px; line-height: 1.6; color: #5B6577; }
+.pr-track { height: 8px; border-radius: 4px; background: #FFFFFF; overflow: hidden; }
+.pr-track i { display: block; height: 8px; background: #E25A1C; }
+.pr-note { margin-top: 20px; background: #F6F8FB; border-radius: 10px; padding: 14px 16px; font-size: 13px; line-height: 1.6; color: #5B6577; }
+.pr-cap { margin: 22px 0 0; font-size: 13px; color: #5B6577; }
+.pr-cap.s { margin-top: 16px; font-size: 12px; }
+.pr-bars { display: flex; align-items: flex-end; height: 140px; margin-top: 8px; border-bottom: 1px solid #C9D1DE; }
+.pr-bar { flex: 1; min-width: 0; height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 6px; }
+.pr-bar i { display: block; width: 100%; max-width: 48px; border-radius: 6px 6px 0 0; background: #C5CFDF; }
+.pr-bar.last i { background: #2557E0; }
+.pr-bar.part i { border: 2px dashed #E25A1C; border-bottom: none; background: #FFFFFF; }
+.pr-bar span { font-size: 13px; color: #5B6577; white-space: nowrap; }
+.pr-bar.last span { font-size: 14px; font-weight: 700; color: #2557E0; }
+.pr-bar.part span { font-weight: 700; color: #B8430F; }
+.pr-bar.abs span { font-weight: 500; margin-bottom: 8px; }
+.pr-wk { display: flex; margin-top: 6px; }
+.pr-wk span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: #5B6577; white-space: nowrap; }
+.pr-many .pr-bar span, .pr-many .pr-wk span { font-size: 11px; }
+.pr-many .pr-bar span { font-size: 10px; letter-spacing: -0.02em; }
+.pr-bars, .pr-wk { overflow: hidden; }
+.pr-fw.grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.pr-to { display: inline-flex; align-items: center; gap: 10px; white-space: nowrap; }
+.pr-imp { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.pr-imp b { font-size: 18px; font-weight: 700; }
+.pr-num { font-family: 'Jua', sans-serif; font-size: 30px; line-height: 1; color: #5B6577; }
+.pr-num.to { color: #2557E0; }
+.pr-div { display: flex; align-items: center; gap: 10px; margin-top: 6px; }
+.pr-div::before, .pr-div::after { content: ''; flex: 1; border-top: 1px solid #C9D1DE; }
+.pr-div span { font-size: 13px; font-weight: 500; color: #5B6577; }
+.pr-fh { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.pr-area { font-family: 'Jua', sans-serif; font-size: 30px; line-height: 1.1; color: #182033; }
+.pr-chip { font-size: 13px; font-weight: 700; color: #B8430F; background: #FDEDE3; border-radius: 999px; padding: 6px 12px; white-space: nowrap; }
+.pr-fw { display: flex; margin-top: 6px; }
+.pr-fw div { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 2px; background: #F6F8FB; border-radius: 8px; padding: 8px 0; }
+.pr-fw b { font-size: 16px; font-weight: 700; line-height: 24px; }
+.pr-fw em { font-style: normal; font-size: 14px; font-weight: 500; line-height: 24px; color: #5B6577; }
+.pr-fw em.p { font-weight: 700; color: #B8430F; }
+.pr-fw small { font-size: 11px; color: #5B6577; white-space: nowrap; }
+.pr-leg { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 18px; font-size: 12px; color: #5B6577; }
+.pr-leg span { display: inline-flex; align-items: center; gap: 6px; }
+.pr-c { display: block; width: 26px; height: 26px; border-radius: 5px; background: #E3E8F0; }
+.pr-c.x { background: #E25A1C; }
+.pr-c.u { border: 2px dashed #8E99AD; background: #FFFFFF; }
+.pr-leg .pr-c { width: 14px; height: 14px; border-radius: 3px; }
+.pr-works { display: flex; flex-direction: column; gap: 16px; margin-top: 12px; }
+.pr-work { display: flex; flex-direction: column; gap: 8px; }
+.pr-wh { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.pr-wh b { font-size: 15px; font-weight: 700; }
+.pr-wh .bad { font-size: 13px; font-weight: 700; color: #B8430F; white-space: nowrap; }
+.pr-wh .good { font-size: 13px; font-weight: 500; color: #2557E0; white-space: nowrap; }
+.pr-cells { display: flex; flex-wrap: wrap; gap: 4px; }
+.pr-intro { margin: 6px 0 12px; font-size: 13px; line-height: 1.6; color: #5B6577; }
+.pr-miss { display: flex; align-items: center; gap: 14px; padding: 12px 0; border-top: 1px solid #E1E6EF; }
+.pr-mr { width: 68px; flex: none; display: flex; flex-direction: column; }
+.pr-mr b { font-family: 'Jua', sans-serif; font-weight: 400; font-size: 28px; line-height: 1; color: #B8430F; }
+.pr-mr small { font-size: 11px; color: #5B6577; margin-top: 4px; white-space: nowrap; }
+.pr-mi { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.pr-mi b { font-size: 15px; font-weight: 700; }
+.pr-mi span { font-size: 13px; color: #5B6577; }
+.pr-mbar { height: 6px; border-radius: 3px; background: #EEF1F6; overflow: hidden; margin-top: 2px; }
+.pr-mbar i { display: block; height: 6px; background: #9AA6BA; }
+.pr-save { height: 52px; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid #C9D1DE; border-radius: 12px; background: #FFFFFF; color: #182033; font-family: 'Noto Sans KR', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
+.pr-save:disabled { opacity: 0.6; cursor: default; }
+.pr-foot { padding: 26px 20px 32px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; }
+.pr-foot b { font-size: 14px; font-weight: 700; }
+.pr-foot b span { color: #2557E0; }
+.pr-foot small { font-size: 12px; color: #5B6577; }
+.pr-out { text-align: center; padding: 0 20px 40px; font-size: 13px; color: #5B6577; }
+.pr-link { background: none; border: none; padding: 6px 4px; color: #2557E0; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+.pr-peek { background: #182033; color: #FFFFFF; font-size: 13px; line-height: 1.5; padding: 8px 16px; text-align: center; }
+.pr-form { display: flex; flex-direction: column; gap: 10px; }
+.pr-form label { font-size: 14px; font-weight: 700; color: #182033; }
+.pr-form input { height: 52px; border: 1px solid #C9D1DE; border-radius: 12px; padding: 0 16px; font-size: 18px; font-family: inherit; background: #FFFFFF; color: #182033; width: 100%; }
+.pr-form input:focus { outline: 2px solid #2557E0; outline-offset: 1px; border-color: #2557E0; }
+.pr-btn { height: 52px; border: none; border-radius: 12px; background: #2557E0; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; width: 100%; }
+.pr-btn.sub { background: #FFFFFF; color: #182033; border: 1px solid #C9D1DE; font-weight: 500; }
+.pr-err { margin: 0; color: #B8430F; font-size: 14px; font-weight: 500; line-height: 1.5; }
+.pr-hint { margin: 0; font-size: 13px; line-height: 1.6; color: #5B6577; }
+
+.ppbox summary { cursor: pointer; }
+.ppbox .ppres p { margin: 0; }
+
 /* ===== 홈 화면에 추가 ===== */
 .a2hs { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 12px; border: 1px solid var(--line); background: var(--sheet); border-radius: 8px; padding: 12px 14px; margin: 0 0 16px; }
 .a2hs-t { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
@@ -542,6 +652,139 @@ function setStats(store, set, items, meId, fresh, subsList) {
   return { count: subs.length, of: subs.length + absent, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v + 1e-9; }).length : null, items: per,
     few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
+
+/* ---------- 학부모 리포트 ---------- */
+// 학부모 비밀번호(맥가이 학번 앞 4자리)는 학생 비밀번호와 따로, 'parents' 시트에 해시로만 둔다.
+function parentHash(env, id, pw) { return env.hash('parent:' + id + ':' + pw); }
+function parentsOf(store) { return store.parents ? store.parents() : []; }
+// '10.3주' → 103 (월·주 순서). 형식이 다르면 0
+function weekOrder(w) { var m = /(\d{1,2})\s*\.\s*(\d)/.exec(String(w || '')); return m ? Number(m[1]) * 10 + Number(m[2]) : 0; }
+// 리포트의 '영역': 문항의 첫 유형(갈래 정보가 없어서)
+function prArea(it) { return (it && it.types && it.types[0]) || '기타'; }
+// 문항별 상태: o 맞음 · x 틀림 · u 안 푼 문항(미완료)
+function prCells(items, sub) {
+  var bl = blankNos(items, sub);
+  return items.map(function (it) {
+    var s = bl[it.no] ? 'u' : sub && sub.marks && sub.marks[it.no] === 'X' ? 'x' : 'o';
+    return { no: it.no, work: String(it.work || ''), area: prArea(it), s: s };
+  });
+}
+function prAreaCount(cells) {
+  var o = {};
+  cells.forEach(function (c) { var b = o[c.area] || (o[c.area] = { n: 0, x: 0, u: 0 }); b.n++; if (c.s === 'x') b.x++; if (c.s === 'u') b.u++; });
+  return o;
+}
+// 같은 학교 재원생이 그 문항을 맞힌 비율(그 문항을 안 푼 학생은 뺌)
+function prItemRates(items, subs) {
+  var o = {};
+  items.forEach(function (it) {
+    var att = 0, ok = 0;
+    subs.forEach(function (s) { if (isBlank(it, s)) return; att++; if (!(s.marks && s.marks[it.no] === 'X')) ok++; });
+    o[it.no] = { att: att, rate: att ? ok / att : 0 };
+  });
+  return o;
+}
+// 가장 먼저 잡을 영역: 그 주 오답률(푼 문항 기준)이 가장 높은 영역
+function prFocus(w, weeks) {
+  var ac = prAreaCount(w.cells), best = null;
+  Object.keys(ac).forEach(function (a) {
+    var b = ac[a], solved = b.n - b.u;
+    if (!solved || !b.x) return;
+    var r = b.x / solved;
+    if (!best || r > best.r + 1e-9 || (Math.abs(r - best.r) < 1e-9 && (b.x > best.x || (b.x === best.x && b.n > best.n)))) best = { area: a, r: r, x: b.x, n: b.n };
+  });
+  if (!best) return null;
+  var works = [], byWork = {};
+  w.cells.forEach(function (c) {
+    if (c.area !== best.area) return;
+    var k = byWork[c.work];
+    if (!k) { k = byWork[c.work] = { work: c.work, cells: '' }; works.push(k); }
+    k.cells += c.s;
+  });
+  return { area: best.area, rate: Math.round(best.r * 100), works: works,
+    weeks: weeks.map(function (x) {
+      if (x.status !== 'done') return { w: x.week, s: x.status };
+      var b = prAreaCount(x.cells)[best.area];
+      return { w: x.week, s: 'done', v: b ? b.x : null };
+    }) };
+}
+// 꼭 다시 볼 문항: 재원생 대부분(절반 넘게, 3명 이상 푼 문항)이 맞혔는데 이 학생이 틀린 문항, 정답률 높은 순 3개
+function prMisses(w) {
+  var rates = prItemRates(w.items, w.subsSet), types = {};
+  w.items.forEach(function (it) { types[it.no] = (it.types || [])[0] || ''; });
+  return w.cells.filter(function (c) { var r = rates[c.no]; return c.s === 'x' && r.att >= 3 && r.rate > 0.5; })
+    .map(function (c) { return { work: c.work, no: c.no, type: types[c.no], rate: Math.round(rates[c.no].rate * 100) }; })
+    .sort(function (a, b) { return b.rate - a.rate || a.no - b.no; }).slice(0, 3);
+}
+function parentReportFor(store, st) {
+  var im = itemsMap(store), all = store.students(), subsAll = store.subs(), checks = store.checks ? store.checks() : [];
+  var mates = {}; all.forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
+  mates[st.id] = 1;
+  var sets = store.sets().filter(function (s) { return s.school === st.school && s.open === false && (im[s.id] || []).length; })
+    .sort(function (a, b) { return weekOrder(a.week) - weekOrder(b.week) || String(a.createdAt).localeCompare(String(b.createdAt)); });
+  var weeks = [];
+  sets.forEach(function (set) {
+    var items = im[set.id], subsSet = subsAll.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; });
+    var mine = subsSet.filter(function (sb) { return sb.studentId === st.id; })[0];
+    if (!mine && String(st.joinedAt || '') > setCutoff(set, subsSet)) return;   // 학원에 오기 전 주
+    var w = { set: set, week: set.week, items: items, subsSet: subsSet, n: items.length };
+    if (mine) {
+      w.cells = prCells(items, mine);
+      w.blank = w.cells.filter(function (c) { return c.s === 'u'; }).length;
+      w.status = w.blank ? 'partial' : 'done';
+      w.score = Math.round(subCredit(items, mine) / items.length * 1000) / 10;
+    } else {
+      var ck = checks.filter(function (c) { return c.setId === set.id && c.studentId === st.id; })[0];
+      w.status = 'absent';
+      w.came = !!ck && (Object.keys(ck.grades || {}).length > 0 || (!!ck.extra && ck.extra !== '결석' && ck.extra !== '무단'));
+    }
+    weeks.push(w);
+  });
+  var out = { name: st.name, school: st.school };
+  if (!weeks.length) { out.none = true; return out; }
+  var i = weeks.length - 1, w = weeks[i];
+  out.week = w.week; out.status = w.status; out.n = w.n;
+  out.bars = weeks.map(function (x) { return { w: x.week, s: x.status, v: x.status === 'absent' ? null : x.score }; });
+  if (w.status === 'absent') {
+    out.came = !!w.came;
+    var j = i - 1; while (j >= 0 && weeks[j].status === 'absent') j--;
+    if (j >= 0) { out.lastWeek = weeks[j].week; out.focus = prFocus(weeks[j], weeks); out.misses = prMisses(weeks[j]); }
+    return out;
+  }
+  out.score = w.score;
+  out.focus = prFocus(w, weeks);
+  out.misses = prMisses(w);
+  if (w.status === 'partial') {
+    out.solved = w.n - w.blank;
+    var und = [], byW = {};
+    w.cells.forEach(function (c) { if (c.s !== 'u') return; if (!byW[c.work]) { byW[c.work] = { work: c.work, n: 0 }; und.push(byW[c.work]); } byW[c.work].n++; });
+    out.undone = und;
+    return out;
+  }
+  // 지난주와 비교(바로 전 주가 결석·미완료면 마지막으로 다 푼 주와)
+  for (var k = i - 1; k >= 0; k--) if (weeks[k].status === 'done') { out.delta = { v: Math.round((w.score - weeks[k].score) * 10) / 10, w: weeks[k].week, last: k === i - 1 }; break; }
+  // 배지: 그 주 같은 학교 재원생 순위가 상위 30% 안일 때만(10% 단위). 안 낸 재원생은 꼴찌로 셈
+  var list = w.subsSet.map(function (sb) { return { id: sb.studentId, v: subCredit(w.items, sb) }; }), done = {};
+  list.forEach(function (o) { done[o.id] = 1; });
+  var cut = setCutoff(w.set, w.subsSet);
+  all.forEach(function (s) { if (s.status === 'active' && s.school === st.school && !done[s.id] && String(s.joinedAt || '') <= cut) list.push({ id: s.id, v: -1 }); });
+  var me = list.filter(function (o) { return o.id === st.id; })[0];
+  var rank = 1 + list.filter(function (o) { return o.v > me.v + 1e-9; }).length, top = Math.ceil(rank * 10 / list.length - 1e-9) * 10;
+  if (top <= 30) out.badge = top;
+  // 나아진 부분: 첫 출석 주(다 푼 주)와 이번 주, 영역별 오답 수가 가장 많이 줄어든 영역
+  var f = 0; while (f < i && weeks[f].status !== 'done') f++;
+  if (f < i) {
+    var a0 = prAreaCount(weeks[f].cells), a1 = prAreaCount(w.cells), imp = null;
+    Object.keys(a1).forEach(function (a) {
+      if (!a0[a]) return;
+      var d = a0[a].x - a1[a].x;
+      if (d > 0 && (!imp || d > imp.d || (d === imp.d && a0[a].x > imp.from))) imp = { area: a, from: a0[a].x, to: a1[a].x, d: d };
+    });
+    if (imp) out.improved = { area: imp.area, from: imp.from, to: imp.to };
+  }
+  return out;
+}
+/* ---------- 학부모 리포트 끝 ---------- */
 
 var ADMIN_WRITES = { addStudents: 1, updateStudent: 1, saveSet: 1, setOpen: 1, deleteSet: 1, resetSub: 1, editSub: 1 };
 
@@ -904,6 +1147,56 @@ var CORE_ACTIONS = {
     if (!set) return fail('세트를 찾을 수 없어요.');
     set.open = !!req.open; store.putSet(set);
     return { ok: true, set: set };
+  },
+
+  /* ---------- 학부모 ---------- */
+  parentInfo: function (req, store, env) {
+    requireAdmin(req, store, env);
+    return { ok: true, ready: !!store.putParents, ids: parentsOf(store).map(function (p) { return p.studentId; }) };
+  },
+
+  setParentPws: function (req, store, env) {
+    requireAdmin(req, store, env);
+    if (!store.putParents) return fail('서버(앱스 스크립트)가 예전 버전이라 학부모 비밀번호를 저장할 수 없어요. 새 omr 파일을 올려 주세요.');
+    var ids = {}; store.students().forEach(function (s) { ids[s.id] = 1; });
+    var now = env.now(), seen = {}, list = [];
+    (Array.isArray(req.list) ? req.list : []).forEach(function (r) {
+      var id = r ? String(r.studentId || '') : '', pw = r ? String(r.pw || '') : '';
+      if (!ids[id] || seen[id] || !/^\d{4}$/.test(pw)) return;
+      seen[id] = 1; list.push({ studentId: id, pwHash: parentHash(env, id, pw), updatedAt: now });
+    });
+    if (list.length) store.putParents(list);
+    return { ok: true, saved: list.length, ids: parentsOf(store).map(function (p) { return p.studentId; }) };
+  },
+
+  parentLogin: function (req, store, env) {
+    var st = store.students().filter(function (s) { return s.id === req.id; })[0];
+    if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
+    var pw = String(req.pw || '');
+    // 4자리가 아니면 선생님 비밀번호(그 학생 리포트 확인용). 틀리면 학부모 잠금과 따로 셈
+    if (!/^\d{4}$/.test(pw) || (env.adminPassword && pw === String(env.adminPassword))) {
+      var na = lockCheck(env, 'padmin');
+      if (!env.adminPassword || pw !== String(env.adminPassword)) { lockBump(env, 'padmin', na); return fail('학부모 비밀번호는 숫자 4자리예요.'); }
+      var pt = env.uuid(); env.cachePut('r:' + pt, st.id, 21600);
+      return { ok: true, token: pt, peek: true };
+    }
+    var key = 'pp:' + st.id, n = lockCheck(env, key);
+    var rec = parentsOf(store).filter(function (p) { return p.studentId === st.id; })[0];
+    if (!rec) return fail('학부모 비밀번호가 아직 등록되지 않았어요. 선생님께 문의해 주세요.');
+    if (parentHash(env, st.id, pw) !== rec.pwHash) { lockBump(env, key, n); return fail('비밀번호가 맞지 않습니다. (' + (n + 1) + '/5)'); }
+    env.cacheRemove('fail:' + key);
+    var t = env.uuid(); env.cachePut('r:' + t, st.id, 21600);
+    return { ok: true, token: t };
+  },
+
+  parentReport: function (req, store, env) {
+    var id = req.token && env.cacheGet('r:' + req.token);
+    if (!id && req.token && req.studentId && env.cacheGet('a:' + req.token)) id = String(req.studentId);   // 선생님 미리보기
+    if (!id) return fail('로그인 시간이 지났습니다. 다시 로그인해 주세요.');
+    var st = store.students().filter(function (s) { return s.id === id; })[0];
+    if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
+    var rep = parentReportFor(store, st); rep.ok = true;
+    return rep;
   },
 
   deleteSet: function (req, store, env) {
@@ -1807,6 +2100,98 @@ function studentSummary(st) {
   var acc = c.total.n ? (c.total.n - c.total.x) / c.total.n : null;
   return { n: ents.length, acc: acc, weak: weak, calc: c, ents: ents };
 }
+
+/* ---------- 학부모 리포트: 학생 탭 ---------- */
+var PP = { info: null, loading: false, text: '', res: null, msg: '', open: false };
+function ppReportUrl() { return location.origin + location.pathname.replace(/[^\/]*$/, '') + 'report/'; }
+function ppLoadInfo() {
+  if (PP.loading) return;
+  PP.loading = true;
+  api('parentInfo', { token: S.token }).then(function (r) {
+    PP.loading = false;
+    PP.info = r.ok ? r : { ok: false, old: /알 수 없는 요청/.test(r.error || ''), err: r.error, ids: [] };
+    if (S.view === 'admin' && A.tab === 'students') renderKeep();
+  });
+}
+// 맥가이 학생 목록(탭으로 나뉜 줄: NO, 학생명, 학교, 학년, 수강상태, 학급, 학번) → 트래커 학생과 학교+이름으로 맞춤
+function ppParse(text) {
+  var d = A.data, idx = {}, out = { list: [], miss: [], bad: [], dup: [], rows: 0, seen: {} };
+  d.students.forEach(function (st) { if (st.status !== 'active') return; var k = attNameKey(st.name) + '|' + attSchoolKey(fullSchool(st.school)); (idx[k] || (idx[k] = [])).push(st); });
+  var col = { name: 1, school: 2, no: 6 };
+  String(text || '').split(/\r?\n/).forEach(function (line) {
+    if (!line.trim()) return;
+    var c = line.split('\t').map(function (x) { return x.trim(); });
+    var hn = c.indexOf('학생명'), hb = c.indexOf('학번');
+    if (hn >= 0 || hb >= 0) { if (hn >= 0) col.name = hn; var hs = c.indexOf('학교'); if (hs >= 0) col.school = hs; if (hb >= 0) col.no = hb; return; }   // 머리글 줄
+    if (c.length < 3) return;
+    var name = attNameKey(c[col.name] || ''), school = c[col.school] || '', no = String(c[col.no] || '').replace(/\s+/g, '');
+    if (!name) return;
+    out.rows++;
+    var label = name + '(' + (school || '학교 없음') + ')';
+    if (!/^\d{5}$/.test(no)) { out.bad.push(label + ' 학번 ' + (no || '없음')); return; }   // 글자 그대로 다뤄 앞자리 0을 지킴
+    var hits = idx[name + '|' + attSchoolKey(school)];
+    if (!hits) { out.miss.push(label); return; }
+    if (hits.length > 1) { out.bad.push(label + ' 트래커에 같은 학교·이름이 둘'); return; }
+    var st = hits[0];
+    if (out.seen[st.id]) { out.dup.push(label); return; }
+    out.seen[st.id] = 1;
+    out.list.push({ studentId: st.id, pw: no.slice(0, 4) });
+  });
+  return out;
+}
+function ppResultHtml(res) {
+  var d = A.data, ids = {}; ((PP.info && PP.info.ids) || []).forEach(function (id) { ids[id] = 1; });
+  var none = d.students.filter(function (s) { return s.status === 'active' && !res.seen[s.id] && !ids[s.id]; }).map(function (s) { return s.name + '(' + s.school + ')'; });
+  var html = '<div class="ppres stack"><p><b>등록할 학생 ' + res.list.length + '명</b> <small class="muted">(붙여 넣은 학생 ' + res.rows + '명)</small></p>';
+  if (res.miss.length) html += '<p class="badtxt">트래커 명단에 없는 학생 ' + res.miss.length + '명: ' + h(res.miss.join(', ')) + '</p>';
+  if (res.bad.length) html += '<p class="badtxt">확인이 필요한 줄 ' + res.bad.length + '개: ' + h(res.bad.join(', ')) + '</p>';
+  if (res.dup.length) html += '<p class="muted">두 번 나온 학생(처음 줄만 씀): ' + h(res.dup.join(', ')) + '</p>';
+  if (none.length) html += '<p class="muted">이 목록에도 없고 아직 비밀번호도 없는 트래커 학생 ' + none.length + '명: ' + h(none.join(', ')) + '</p>';
+  return html + '</div>';
+}
+function ppBox() {
+  var d = A.data, act = d.students.filter(function (s) { return s.status === 'active'; });
+  if (!PP.info && !PP.loading) setTimeout(ppLoadInfo, 0);
+  var ids = {}; ((PP.info && PP.info.ids) || []).forEach(function (id) { ids[id] = 1; });
+  var reg = act.filter(function (s) { return ids[s.id]; }).length, url = ppReportUrl();
+  var state = !PP.info ? '불러오는 중…' : PP.info.old ? '서버 파일(omr v17)을 올리면 쓸 수 있어요' : PP.info.ok ? '학부모 비밀번호 등록 ' + reg + ' / ' + act.length + '명' : (PP.info.err || '');
+  var opts = act.slice().sort(function (a, b) { return a.school.localeCompare(b.school, 'ko') || a.name.localeCompare(b.name, 'ko'); })
+    .map(function (s) { return '<option value="' + h(s.id) + '"' + (PP.sel === s.id ? ' selected' : '') + '>' + h(s.name + ' (' + s.school + ')') + (ids[s.id] ? '' : ' · 비밀번호 없음') + '</option>'; }).join('');
+  return '<details class="block sheet ppbox" id="pp-box"' + (PP.open ? ' open' : '') + ' ontoggle="PP.open = this.open"><summary><b>학부모 리포트</b> <small class="muted">' + h(state) + '</small></summary><div class="stack">' +
+    '<p class="note">학부모 주소: <a href="' + h(url) + '" target="_blank" rel="noopener">' + h(url) + '</a> <button class="mini" data-act="pp-copy">주소 복사</button></p>' +
+    '<p class="note">맥가이 학생 목록을 표째로 복사해서 붙여 넣고 "확인"을 눌러 주세요. 순서는 NO·학생명·학교·학년·수강상태·학급·학번이고, 맨 위 머리글 줄은 있어도 돼요. 학번 앞 4자리가 학부모 비밀번호가 되고, 다시 등록하면 새 번호로 바뀌어요.</p>' +
+    '<textarea id="in-pp" rows="5" placeholder="1&#9;김민준(동양)&#9;동양고&#9;고1&#9;수강&#9;동양A&#9;14752">' + h(PP.text) + '</textarea>' +
+    '<div class="actions" style="justify-content:flex-start"><button class="btn" data-act="pp-check">확인</button>' + (PP.res && PP.res.list.length ? '<button class="btn primary" data-act="pp-save">' + PP.res.list.length + '명 등록</button>' : '') + '</div>' +
+    (PP.res ? ppResultHtml(PP.res) : '') + (PP.msg ? '<p class="oktxt">' + h(PP.msg) + '</p>' : '') +
+    '<div class="toolbar"><label for="sel-pp">리포트 미리보기</label><select id="sel-pp">' + opts + '</select><button class="btn" data-act="pp-preview">학부모 화면으로 보기</button></div>' +
+    '<p class="note">학부모 화면에는 마감한 주차만 나와요. 학부모 화면에서 학생 이름과 선생님 비밀번호를 넣어도 그 학생 리포트를 볼 수 있어요.</p></div></details>';
+}
+function ppClick(t, act) {
+  var ta = document.getElementById('in-pp'); if (ta) PP.text = ta.value;
+  var sel = document.getElementById('sel-pp'); if (sel) PP.sel = sel.value;
+  PP.open = true;
+  if (act === 'pp-copy') { copyText(ppReportUrl(), null); return; }
+  if (act === 'pp-check') {
+    PP.msg = ''; PP.res = ppParse(PP.text);
+    if (!PP.res.rows) { PP.res = null; toast('붙여 넣은 학생 줄이 없어요. 맥가이 학생 목록을 표째로 복사해 주세요.', true); }
+    return renderKeep();
+  }
+  if (act === 'pp-save') {
+    if (!PP.res || !PP.res.list.length) return;
+    t.disabled = true;
+    api('setParentPws', { token: S.token, list: PP.res.list }).then(function (r) {
+      t.disabled = false;
+      if (!r.ok) { toast(r.error, true); return; }
+      PP.info = { ok: true, ids: r.ids }; PP.msg = r.saved + '명의 학부모 비밀번호를 등록했어요.'; PP.res = null; PP.text = '';
+      renderKeep();
+    });
+    return;
+  }
+  if (act === 'pp-preview') {
+    if (!PP.sel) return;
+    window.open(location.pathname + '?parent#pv=' + encodeURIComponent(S.token + '.' + PP.sel), '_blank');
+  }
+}
 function tabStudents() {
   var d = A.data;
   var list = d.students.filter(function (s) { return (A.school === '전체' || s.school === A.school); })
@@ -1814,6 +2199,7 @@ function tabStudents() {
   var html = '<section class="block sheet"><h2>학생 추가</h2><p class="note">한 줄에 한 명씩, 이름과 학교를 같이 넣어 주세요. 순서는 상관없고 "동양고"는 "동양"으로 줄여서 저장해요. "김도현(동양)"처럼 괄호를 붙여도 괄호는 빼고 저장되고, 동명이인 구분은 사이트가 알아서 해요. 비밀번호는 0000으로 시작하고, 첫 로그인 때 학생이 바꿔요.</p>' +
     '<textarea id="in-add" rows="4" placeholder="김민준&#9;동양고&#10;김지원&#9;경복여고"></textarea><div class="actions"><button class="btn primary" data-act="add-students">추가</button></div>' +
     (A.addMsg ? '<p class="note">' + h(A.addMsg) + '</p>' : '') + '</section>';
+  html += ppBox();
   html += '<div class="toolbar"><div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
     return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
   }).join('') + '</div><input id="in-q" placeholder="이름 검색" value="' + h(A.q) + '"></div>';
@@ -2419,7 +2805,7 @@ function smsText(r) {
     if (r.set.homework.some(function (hw) { var g = r.ck && r.ck.grades[hw]; return g === 'B' || g === 'F'; })) hwLines.push('* 미흡한 과제는 학원에서 완료했습니다.');
     secs.push(hwLines);
   }
-  if (r.n && (!absent || r.sub)) secs.push(['■ 확인 암기 테스트 성취도', r.sub ? (r.partial ? '- 총 ' + r.n + '문항 · 정답률 ' + pct(r.pct) + ' (완벽히 맞힌 문항 ' + r.score + '개)' : '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답') : '- 미제출']);
+  if (r.n && (!absent || r.sub)) secs.push(['■ 확인 암기 테스트 성취도', r.sub ? (r.partial ? '- 총 ' + r.n + '문항 · 정답률 ' + pct(r.pct) + ' (완벽히 맞힌 문항 ' + r.score + '개' + (r.blank ? ' · ' + r.blank + '문항 미완료' : '') + ')' : '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' + (r.blank ? ' (' + r.blank + '문항 미완료)' : '')) : '- 미제출']);
   var ex = gradeOnly(r.extra);
   if (ex && r.set.evalName) secs.push(['■ ' + r.set.evalName + ' 성취도', '- ' + ex + ' ( A+ / A / B / C / F)']);
   // 학생별 피드백을 넣는 중이어도 입력 없는 세트는 피드백이 없으니 진행 사항 문장을 넣음
@@ -2628,6 +3014,7 @@ function onClick(ev) {
   if (!t) return;
   if (t.dataset.act === 'close-modal' && ev.target.closest('[data-stop]') && !ev.target.closest('button[data-act="close-modal"]')) return;
   var act = t.dataset.act, id = t.dataset.id;
+  if (act.indexOf('pp-') === 0) { ppClick(t, act); return; }
   if (act === 'demo-student') { L.name = '김지원'; lookup('김지원'); return; }
   if (act === 'demo-admin') { adminLogin('123456'); return; }
   if (act === 'to-admin') { L.err = ''; setView('admin-login'); return; }
@@ -3035,6 +3422,232 @@ function afterRender() {
 }
 
 
+/* ===== 학부모 주간 리포트 화면 (?parent · report/) ===== */
+var PARENT_MODE = /(?:^|&)parent(?:[=&]|$)/.test(location.search.slice(1));
+var PR = { view: 'login', name: store_get('pname') || '', matches: [], pick: null, err: '', token: store_get('ptoken'), peek: false, pv: null, rep: null };
+var PR_ACC = '#2557E0';
+function prGiven(name) {
+  var n = String(name || '').replace(/\s*\(.*?\)\s*$/, '').replace(/\s+/g, '');
+  if (!/^[가-힣]+$/.test(n) || n.length < 2) return n;
+  if (n.length >= 4 && /^(남궁|황보|제갈|사공|선우|서문|독고|동방)/.test(n)) return n.slice(2);
+  return n.slice(1);
+}
+function prJosa(w, a, b) { var c = w.charCodeAt(w.length - 1); return w + (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 !== 0 ? a : b); }
+function prWork(w) { return w ? '‘' + w + '’' : '문항'; }
+function prType(t) { return TYPES[t] || t || '기타'; }
+function prNum(v) { return String(Math.round(Number(v) * 10) / 10); }
+function prBoot() {
+  document.title = '내신 클리닉 주간 리포트';
+  document.body.classList.add('parent');
+  var fl = document.createElement('link'); fl.rel = 'stylesheet';
+  fl.href = 'https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap';
+  document.head.appendChild(fl);
+  document.addEventListener('click', prClick);
+  document.addEventListener('submit', prSubmit);
+  document.addEventListener('input', function (e) { if (e.target && e.target.id === 'pin-pw') { var v = e.target.value.replace(/\D/g, '').slice(0, 12); if (v !== e.target.value) e.target.value = v; } });
+  // 선생님 화면의 '학부모 화면으로 보기': #pv=선생님토큰.학생번호 (주소창에서는 바로 지움)
+  var m = /(?:^#|&)pv=([^&]+)/.exec(location.hash);
+  if (m) {
+    var p = decodeURIComponent(m[1]), k = p.lastIndexOf('.');
+    if (k > 0) PR.pv = { token: p.slice(0, k), sid: p.slice(k + 1) };
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+  }
+  if (PR.pv || PR.token) prLoad(); else prRender();
+}
+function prRender() {
+  var v = PR.view, html = '';
+  if (v === 'report' && PR.rep) html = prReportHtml(PR.rep);
+  else html = prLoginHtml();
+  root.innerHTML = html;
+  var f = root.querySelector('[autofocus]'); if (f && !('ontouchstart' in window)) f.focus();
+}
+function prLoginHtml() {
+  var body = '';
+  if (PR.view === 'pick') {
+    body = '<section class="pr-sec pr-form"><h2>학생을 골라 주세요</h2><p class="pr-hint">같은 이름의 학생이 있어요. 학교를 확인해 주세요.</p>' +
+      PR.matches.map(function (m) { return '<button type="button" class="pr-btn sub" data-pr="pick" data-id="' + h(m.id) + '" data-label="' + h(m.label) + '">' + h(m.label) + '</button>'; }).join('') +
+      '<button type="button" class="pr-link" data-pr="back">이름 다시 입력</button></section>';
+  } else if (PR.view === 'pw') {
+    body = '<form class="pr-sec pr-form" id="pf-pw" novalidate><h2>' + h(PR.pick.label) + ' 학부모님</h2>' +
+      '<label for="pin-pw">학부모 비밀번호</label>' +
+      '<input id="pin-pw" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="current-password" placeholder="숫자 4자리" autofocus>' +
+      '<p class="pr-hint">학원에 등록된 학부모님 휴대폰 번호 뒤 4자리예요.</p>' +
+      (PR.err ? '<p class="pr-err" role="alert">' + h(PR.err) + '</p>' : '') +
+      '<button class="pr-btn" type="submit">리포트 보기</button><button type="button" class="pr-link" data-pr="back">이름 다시 입력</button></form>';
+  } else {
+    body = '<form class="pr-sec pr-form" id="pf-name" novalidate><label for="pin-name">학생 이름</label>' +
+      '<input id="pin-name" autocomplete="off" value="' + h(PR.name) + '" placeholder="홍길동" autofocus>' +
+      (PR.err ? '<p class="pr-err" role="alert">' + h(PR.err) + '</p>' : '') +
+      '<button class="pr-btn" type="submit">다음</button></form>';
+  }
+  return '<div class="pr"><div class="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span></div>' +
+    '<div class="pr-title"><h1 class="pr-h1">학부모 확인</h1></div><p class="pr-sub">학생 이름과 학부모 비밀번호로 들어와 주세요.</p></header>' +
+    '<main class="pr-main">' + body + '</main><footer class="pr-foot"><small>리포트는 매주 클리닉 최종 마감 후 갱신됩니다.</small></footer></div></div>';
+}
+function prClick(ev) {
+  var t = ev.target.closest('[data-pr]'); if (!t) return;
+  var a = t.dataset.pr;
+  if (a === 'back') { PR.view = 'login'; PR.err = ''; prRender(); return; }
+  if (a === 'pick') { PR.pick = { id: t.dataset.id, label: t.dataset.label }; PR.view = 'pw'; PR.err = ''; prRender(); return; }
+  if (a === 'logout') { store_set('ptoken', null); PR.token = null; PR.peek = false; PR.pv = null; PR.rep = null; PR.view = 'login'; PR.err = ''; prRender(); window.scrollTo(0, 0); return; }
+  if (a === 'save') { prSaveImage(t); return; }
+}
+function prSubmit(ev) {
+  var f = ev.target; ev.preventDefault();
+  if (f.dataset.busy) return;
+  if (f.id === 'pf-name') {
+    var name = (document.getElementById('pin-name').value || '').trim();
+    if (!name) { PR.err = '학생 이름을 입력해 주세요.'; return prRender(); }
+    f.dataset.busy = '1';
+    api('lookup', { name: name }).then(function (r) {
+      delete f.dataset.busy;
+      PR.name = name;
+      if (!r.ok) { PR.err = /이름을 입력/.test(r.error || '') ? r.error : r.error && /명단에 없는/.test(r.error) ? '등록된 학생 이름이 아니에요. 학생 이름을 정확히 입력해 주세요.' : (r.error || '잠시 뒤에 다시 시도해 주세요.'); return prRender(); }
+      store_set('pname', name); PR.err = '';
+      if (r.matches.length === 1) { PR.pick = r.matches[0]; PR.view = 'pw'; } else { PR.matches = r.matches; PR.view = 'pick'; }
+      prRender();
+    });
+    return;
+  }
+  if (f.id === 'pf-pw') {
+    var pw = (document.getElementById('pin-pw').value || '').trim();
+    if (!/^\d{4,12}$/.test(pw)) { PR.err = '학부모 비밀번호 숫자 4자리를 입력해 주세요.'; return prRender(); }
+    f.dataset.busy = '1';
+    api('parentLogin', { id: PR.pick.id, pw: pw }).then(function (r) {
+      delete f.dataset.busy;
+      if (!r.ok) { PR.err = r.error || '잠시 뒤에 다시 시도해 주세요.'; return prRender(); }
+      PR.token = r.token; PR.peek = !!r.peek; PR.err = '';
+      if (!r.peek) store_set('ptoken', r.token);
+      prLoad();
+    });
+  }
+}
+function prLoad() {
+  var req = PR.pv ? { token: PR.pv.token, studentId: PR.pv.sid } : { token: PR.token };
+  api('parentReport', req).then(function (r) {
+    if (!r.ok) {
+      if (!PR.pv) { store_set('ptoken', null); PR.token = null; }
+      PR.view = PR.pick ? 'pw' : 'login'; PR.err = r.error || '잠시 뒤에 다시 시도해 주세요.';
+      return prRender();
+    }
+    PR.rep = r; PR.view = 'report'; prRender(); window.scrollTo(0, 0);
+  });
+}
+function prBarsHtml(bars) {
+  var n = bars.length, many = n > 6, gap = many ? 4 : n > 5 ? 6 : 12;
+  return '<p class="pr-cap">개강 후 정답률</p><div class="' + (many ? 'pr-many' : '') + '"><div class="pr-bars" style="gap: ' + gap + 'px">' + bars.map(function (b, i) {
+    var last = i === n - 1, hh = b.v ? Math.round(b.v * 1.05) : 0;
+    if (b.s === 'absent') return '<div class="pr-bar abs"><span>결석</span></div>';
+    if (b.s === 'partial') return '<div class="pr-bar part"><span>미완료</span><i style="height: ' + hh + 'px"></i></div>';
+    return '<div class="pr-bar' + (last ? ' last' : '') + '"><span>' + (many ? Math.round(b.v) : prNum(b.v)) + '%</span><i style="height: ' + hh + 'px"></i></div>';
+  }).join('') + '</div><div class="pr-wk" style="gap: ' + gap + 'px">' + bars.map(function (b) { return '<span>' + h(many ? String(b.w).replace(/주$/, '') : b.w) + '</span>'; }).join('') + '</div></div>';
+}
+function prFocusHtml(r, f, absent) {
+  var when = absent ? r.lastWeek : '이번 주', anyU = f.works.some(function (w) { return w.cells.indexOf('u') >= 0; });
+  var html = '<section class="pr-sec"><h2>가장 먼저 잡을 영역</h2><div class="pr-fh"><span class="pr-area">' + h(prType(f.area)) + '</span><span class="pr-chip">' + h(when) + ' 오답률 ' + f.rate + '%</span></div>' +
+    '<p class="pr-small">' + (absent ? h(r.lastWeek) + '에 가장 많이 틀린 영역입니다.' : '이번 주 가장 많이 틀린 영역입니다.') + '</p>';
+  if (r.bars.length > 1) {
+    var many = false, grid = f.weeks.length > 6;   // 주가 많으면 5칸씩 두 줄로
+    html += '<p class="pr-cap s">개강 후 오답 수</p><div class="pr-fw' + (grid ? ' grid' : '') + '" style="gap: 6px">' + f.weeks.map(function (x) {
+      var top = x.s === 'absent' ? '<em>결석</em>' : x.s === 'partial' ? '<em class="p">미완료</em>' : x.v === null ? '<em>–</em>' : '<b>' + x.v + '개</b>';
+      return '<div>' + top + '<small>' + h(many ? String(x.w).replace(/주$/, '') : x.w) + '</small></div>';
+    }).join('') + '</div>';
+  }
+  html += '<div class="pr-leg"><span><i class="pr-c"></i>맞음</span><span><i class="pr-c x"></i>틀림</span>' + (anyU ? '<span><i class="pr-c u"></i>미완료</span>' : '') + '</div>';
+  html += '<div class="pr-works">' + f.works.map(function (w) {
+    var x = (w.cells.match(/x/g) || []).length, u = (w.cells.match(/u/g) || []).length, parts = [];
+    if (x) parts.push(x + '문항 틀림'); if (u) parts.push(u + '문항 미완료');
+    return '<div class="pr-work"><div class="pr-wh"><b>' + h(prWork(w.work)) + '</b>' + (parts.length ? '<span class="bad">' + parts.join(' · ') + '</span>' : '<span class="good">모두 정답</span>') + '</div>' +
+      '<div class="pr-cells">' + w.cells.split('').map(function (c) { return '<i class="pr-c' + (c === 'x' ? ' x' : c === 'u' ? ' u' : '') + '"></i>'; }).join('') + '</div></div>';
+  }).join('') + '</div></section>';
+  return html;
+}
+function prReportHtml(r) {
+  var given = prGiven(r.name), nameGen = prJosa(given, '이의', '의'), nameSubj = prJosa(given, '이가', '가'), school = fullSchool(r.school);
+  var star = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg>';
+  var bar = PR.pv ? '<div class="pr-peek">선생님 미리보기 · ' + h(r.name) + ' 학부모 화면</div>' : PR.peek ? '<div class="pr-peek">선생님 확인용 · ' + h(r.name) + ' 학부모 화면을 보는 중이에요.</div>' : '';
+  var out = PR.pv ? '' : '<div class="pr-out"><button type="button" class="pr-link" data-pr="logout">다른 학생 보기 · 로그아웃</button></div>';
+  if (!PR.pv) bar += '<div id="a2hs-slot">' + a2hsHtml() + '</div>';
+  if (r.none) {
+    return bar + '<div class="pr"><div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span></div>' +
+      '<div class="pr-title"><h1 class="pr-h1">' + h(nameGen) + ' 리포트</h1></div><p class="pr-sub">' + h(school) + ' 1학년</p></header>' +
+      '<main class="pr-main"><section class="pr-sec"><h2>아직 리포트가 없어요</h2><p class="pr-p">첫 클리닉 주차가 최종 마감되면 이곳에 리포트가 만들어집니다.</p></section></main>' +
+      '<footer class="pr-foot"><b>' + h(school) + ' 1학년 담당 강사 배진희 <span>♥</span></b><small>리포트는 매주 클리닉 최종 마감 후 갱신됩니다.</small></footer></div>' + out + '</div>';
+  }
+  var absent = r.status === 'absent', partial = r.status === 'partial', hasHist = r.bars.length > 1;
+  var html = bar + '<div class="pr"><div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span><span class="pr-pill">최종 마감</span></div>' +
+    '<div class="pr-title"><h1 class="pr-h1">' + h(nameGen) + ' ' + h(r.week) + '</h1>' + (r.badge ? '<span class="pr-badge">' + star + '<span>' + h(school) + ' 재원생 상위 ' + r.badge + '%</span></span>' : '') + '</div>' +
+    '<p class="pr-sub">' + h(school) + ' 1학년 · ' + h(r.week) + ' 클리닉 최종 마감 기준</p></header><main class="pr-main">';
+  // 이번 주 기록 / 정답률
+  html += '<section class="pr-sec"><h2>' + (absent ? '이번 주 기록' : '이번 주 정답률') + '</h2>';
+  if (absent) {
+    html += r.came ? '<span class="pr-big gray">미제출</span><p class="pr-p">' + h(r.week) + ' 클리닉 확인 테스트를 제출하지 않아 기록이 없습니다.</p>'
+      : '<span class="pr-big gray">결석</span><p class="pr-p">개인 사정으로 등원하지 못해 ' + h(r.week) + ' 클리닉 기록이 없습니다.</p>';
+  } else {
+    var d = r.delta, dl = d ? (d.last ? '지난주보다' : d.w + '보다') : '';
+    html += '<div class="pr-row"><span class="pr-big">' + prNum(r.score) + '%</span>' +
+      (d && d.v > 0 ? '<span class="pr-up"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10.5V1.5M2.5 5L6 1.5L9.5 5"></path></svg><span>' + h(dl) + ' +' + prNum(d.v) + '%p</span></span>' : '') +
+      (d && d.v < 0 ? '<span class="pr-down">' + h(dl) + ' −' + prNum(-d.v) + '%p</span>' : '') + '</div>';
+  }
+  if (partial) {
+    html += '<div class="pr-part"><b>' + r.n + '문항 중 ' + r.solved + '문항만 풀고 하원했습니다.</b><div class="pr-track"><i style="width: ' + Math.round(r.solved / r.n * 100) + '%"></i></div>' +
+      '<span>미완료: ' + h((r.undone || []).map(function (u) { return prWork(u.work) + ' ' + u.n + '문항'; }).join(', ')) + '</span>' +
+      '<small>안 푼 문항은 틀린 것으로 계산했으며, 이번 주는 다른 주와 비교하지 않습니다.</small></div>';
+  }
+  if (hasHist) html += prBarsHtml(r.bars);
+  else if (!absent) html += '<div class="pr-note">첫 주 리포트입니다. 다음 주부터 정답률 변화와 나아진 부분이 함께 표시됩니다.</div>';
+  html += '</section>';
+  if (r.improved) {
+    html += '<section class="pr-sec"><h2>나아진 부분</h2><div class="pr-imp"><b>' + h(prType(r.improved.area)) + ' 오답</b><span class="pr-to"><span class="pr-num">' + r.improved.from + '개</span>' +
+      '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + PR_ACC + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"></path></svg>' +
+      '<span class="pr-num to">' + r.improved.to + '개</span></span></div><p class="pr-small" style="margin-top: 10px">개강 첫 주와 이번 주의 오답 수를 비교했습니다.</p></section>';
+  }
+  if (absent && r.lastWeek && (r.focus || (r.misses && r.misses.length))) html += '<div class="pr-div"><span>마지막으로 참여한 ' + h(r.lastWeek) + ' 기록</span></div>';
+  if (r.focus) html += prFocusHtml(r, r.focus, absent);
+  if (r.misses && r.misses.length) {
+    html += '<section class="pr-sec"><h2>꼭 다시 볼 문항</h2><p class="pr-intro">재원생 대부분이 맞혔지만 ' + h(nameSubj) + ' 놓친 문항입니다. 가장 먼저 다시 봐야 할 문항이에요.</p>' +
+      r.misses.map(function (m) {
+        return '<div class="pr-miss"><div class="pr-mr"><b>' + m.rate + '%</b><small>재원생 정답률</small></div><div class="pr-mi"><b>' + h(prWork(m.work) + ' ' + m.no + '번') + '</b><span>' + h(prType(m.type)) + '</span>' +
+          '<div class="pr-mbar"><i style="width: ' + m.rate + '%"></i></div></div></div>';
+      }).join('') + '</section>';
+  }
+  html += '<button type="button" class="pr-save" data-pr="save" data-html2canvas-ignore="true"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="' + PR_ACC + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"></path></svg><span>이미지로 저장</span></button>';
+  html += '</main><footer class="pr-foot"><b>' + h(school) + ' 1학년 담당 강사 배진희 <span>♥</span></b><small>리포트는 매주 클리닉 최종 마감 후 갱신됩니다.</small></footer></div>' + out + '</div>';
+  return html;
+}
+// 리포트 전체를 세로 이미지 한 장으로(휴대폰은 공유 창 → 사진 저장, 컴퓨터는 내려받기)
+var H2C_URL = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+function prSaveImage(btn) {
+  var el = document.getElementById('pr-card'); if (!el || btn.disabled) return;
+  var lab = btn.querySelector('span'), old = lab ? lab.textContent : '';
+  btn.disabled = true; if (lab) lab.textContent = '이미지 만드는 중…';
+  var done = function (msg) { btn.disabled = false; if (lab) lab.textContent = old; if (msg) toast(msg, true); };
+  var go = function () {
+    (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function () {
+      return window.html2canvas(el, { scale: 2, backgroundColor: '#F3F5F9', useCORS: true, logging: false });
+    }).then(function (cv) {
+      cv.toBlob(function (blob) {
+        if (!blob) return done('이미지를 만들지 못했어요. 화면을 캡처해 주세요.');
+        var r = PR.rep || {}, fname = (r.name || '리포트') + '_' + (r.week || '') + '_클리닉리포트.png';
+        var file = null; try { file = new File([blob], fname, { type: 'image/png' }); } catch (e) {}
+        var touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        if (touch && file && navigator.canShare && navigator.canShare({ files: [file] })) {
+          navigator.share({ files: [file], title: fname }).then(function () { done(); }, function () { done(); });
+          return;
+        }
+        var url = URL.createObjectURL(blob), a = document.createElement('a');
+        a.href = url; a.download = fname; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+        done();
+      }, 'image/png');
+    }).catch(function () { done('이미지를 만들지 못했어요. 화면을 캡처해 주세요.'); });
+  };
+  if (window.html2canvas) return go();
+  var s = document.createElement('script'); s.src = H2C_URL; s.async = true;
+  s.onload = go; s.onerror = function () { done('이미지 도구를 불러오지 못했어요. 인터넷 연결을 확인해 주세요.'); };
+  document.head.appendChild(s);
+}
+
 /* ===== 홈 화면에 추가(앱처럼 쓰기) ===== */
 var A2HS = { evt: null, done: false, help: false, mode: /(?:^|&)parent(?:[=&]|$)/.test(location.search.slice(1)) ? 'parent' : 'student' };
 window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); A2HS.evt = e; a2hsRefresh(); });
@@ -3103,6 +3716,7 @@ if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.
 }
 function boot() {
   root = document.getElementById('app');
+  if (PARENT_MODE) { prBoot(); return; }
   document.addEventListener('click', onClickSafe);
   document.addEventListener('change', onChange);
   document.addEventListener('input', onInput);
