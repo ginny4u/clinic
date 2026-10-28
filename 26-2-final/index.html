@@ -442,6 +442,7 @@ body.parent .busybar { background: #2557E0; }
 .pr-hint { margin: 0; font-size: 13px; line-height: 1.6; color: #5B6577; }
 
 .ppbox summary { cursor: pointer; }
+.fbl .fbst { font-weight: 400; margin-left: .3em; }
 .ppbox .ppres p { margin: 0; }
 
 /* ===== 홈 화면에 추가 ===== */
@@ -480,7 +481,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 14;
+var CORE_VERSION = 15;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -657,6 +658,8 @@ function setStats(store, set, items, meId, fresh, subsList) {
 // 학부모 비밀번호(맥가이 학번 5자리)는 학생 비밀번호와 따로, 'parents' 시트에 해시로만 둔다.
 function parentHash(env, id, pw) { return env.hash('parent:' + id + ':' + pw); }
 function parentsOf(store) { return store.parents ? store.parents() : []; }
+// 학부모 문자의 개인 피드백 중 선생님이 고친 문장: 세트·학생마다 한 줄('fbs' 시트)
+function fbsOf(store) { return store.fbs ? store.fbs() : []; }
 // '10.3주' → 103 (월·주 순서). 형식이 다르면 0
 function weekOrder(w) { var m = /(\d{1,2})\s*\.\s*(\d)/.exec(String(w || '')); return m ? Number(m[1]) * 10 + Number(m[2]) : 0; }
 // 리포트의 '영역': 문항의 첫 유형(갈래 정보가 없어서)
@@ -1089,6 +1092,7 @@ var CORE_ACTIONS = {
     if (!sub) return fail('지울 제출 기록이 없어요. 새로고침해 보세요.');
     if (!store.deleteSub) return fail('서버가 아직 예전 버전이라 초기화할 수 없어요.');
     store.deleteSub(req.setId, req.studentId);
+    if (store.deleteFb) store.deleteFb(req.setId, req.studentId);
     return { ok: true };
   },
 
@@ -1115,6 +1119,7 @@ var CORE_ACTIONS = {
     var pctBefore = subCredit(items, sub) / items.length;
     sub.marks = marks; sub.follow = follow;
     store.putSub(sub);
+    if (store.deleteFb) store.deleteFb(set.id, req.studentId);
     return { ok: true, before: before, score: items.length - Object.keys(marks).length, total: items.length, pctBefore: pctBefore, pct: subCredit(items, sub) / items.length, partial: setPartial(items) };
   },
 
@@ -1150,6 +1155,25 @@ var CORE_ACTIONS = {
     if (!set) return fail('세트를 찾을 수 없어요.');
     set.open = !!req.open; store.putSet(set);
     return { ok: true, set: set };
+  },
+
+  /* ---------- 학부모 문자 개인 피드백(선생님이 고친 문장) ---------- */
+  fbAll: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var want = Array.isArray(req.setIds) ? req.setIds.map(String) : null;
+    return { ok: true, ready: !!store.putFb, fbs: fbsOf(store).filter(function (f) { return !want || want.indexOf(String(f.setId)) >= 0; }) };
+  },
+
+  saveFb: function (req, store, env) {
+    requireAdmin(req, store, env);
+    if (!store.putFb) return fail('서버(앱스 스크립트)가 예전 버전이라 고친 피드백을 서버에 저장할 수 없어요. 새 omr 파일을 올려 주세요.');
+    var setId = String(req.setId || ''), sid = String(req.studentId || '');
+    if (!store.sets().some(function (s) { return s.id === setId; })) return fail('세트를 찾을 수 없어요.');
+    if (!store.students().some(function (s) { return s.id === sid; })) return fail('학생을 찾을 수 없어요.');
+    if (req.text === null || req.text === undefined) { store.deleteFb(setId, sid); return { ok: true, fb: null }; }
+    var rec = { setId: setId, studentId: sid, text: String(req.text).slice(0, 2000), updatedAt: env.now() };
+    store.putFb(rec);
+    return { ok: true, fb: rec };
   },
 
   /* ---------- 학부모 ---------- */
@@ -1748,6 +1772,7 @@ function viewAdminLogin() {
     '<button class="link" type="button" data-act="back-login">학생 로그인으로</button></form></main>';
 }
 function loadAdmin() {
+  FB.loaded = {}; A.fbEdit = {};
   return api('adminAll', { token: S.token }).then(function (r) {
     if (!r.ok) { logout(r.error); return; }
     applyAdmin(r);
@@ -2738,11 +2763,93 @@ function fbCompose(set, sub, d, used, idx) {
 }
 
 function fbKey(r) { return r.set.id + '.' + r.st.id; }
-function fbText(r) {
+/* ---------- 개인 피드백: 고친 문장 서버 저장 ---------- */
+// FB.srv: 서버에 있는 고친 문장(세트.학생 → 글), FB.ready: true 서버 저장 / false 예전 서버(이 컴퓨터에만) / null 아직 모름
+// 이 컴퓨터(localStorage 'fb.세트.학생')에는 서버에 아직 못 올린 문장만 남김. FB_DEL = '자동 문장으로' 되돌린 것을 서버에 아직 못 알림
+var FB = { srv: {}, ready: null, loaded: {}, timers: {}, st: {}, pushed: false };
+var FB_DEL = '\u0000';
+function fbSplit(k) { var i = k.lastIndexOf('.'); return [k.slice(0, i), k.slice(i + 1)]; }
+function fbLocalKeys() {
+  var out = [];
+  try { for (var i = 0; i < localStorage.length; i++) { var m = /^clinic\.fb\.(.+\..+)$/.exec(localStorage.key(i) || ''); if (m) out.push(m[1]); } } catch (e) { }
+  return out;
+}
+function fbOwn(r) {
   var k = fbKey(r);
-  if (A.fbEdit[k] === undefined) { var sv = store_get('fb.' + k); if (sv !== null) A.fbEdit[k] = sv; }
-  if (A.fbEdit[k] !== undefined) return A.fbEdit[k];
-  return r.sub ? feedbackFor(r.set, r.sub, A.data) : '';
+  if (A.fbEdit[k] !== undefined) return A.fbEdit[k] === null ? undefined : A.fbEdit[k];
+  var lv = store_get('fb.' + k);
+  if (lv !== null) return lv === FB_DEL ? undefined : lv;
+  return FB.srv[k];
+}
+function fbStatusText(k) {
+  var s = FB.st[k];
+  if (s === 'wait' || s === 'saving') return '저장 중…';
+  if (s === 'ok') return '저장됨';
+  if (s === 'err') return '서버에 저장 못 함 · 이 컴퓨터에는 남아 있어요';
+  if (s === 'local' || (FB.ready === false && store_get('fb.' + k) !== null)) return '이 컴퓨터에만 저장돼요 (새 omr 파일을 올리면 다른 컴퓨터에서도 보여요)';
+  return '';
+}
+function fbStatus(k) {
+  var t = fbStatusText(k), bad = FB.st[k] === 'err' || FB.st[k] === 'local' || (FB.ready === false && store_get('fb.' + k) !== null);
+  document.querySelectorAll('[data-fbst]').forEach(function (el) { if (el.dataset.fbst === k) { el.textContent = t; el.className = 'fbst ' + (bad ? 'badtxt' : 'muted'); } });
+}
+// 고친 문장 저장: v가 null이면 자동 문장으로 되돌림
+function fbSet(k, v) {
+  A.fbEdit[k] = v;
+  if (FB.ready === false) store_set('fb.' + k, v);   // 예전 서버: 지금처럼 이 컴퓨터에만
+  else { store_set('fb.' + k, v === null ? FB_DEL : v); fbQueue(k, v, 700); }
+}
+function fbQueue(k, v, ms) {
+  clearTimeout(FB.timers[k]);
+  FB.st[k] = 'wait'; fbStatus(k);
+  FB.timers[k] = setTimeout(function () {
+    var p = fbSplit(k), lv = v === null ? FB_DEL : v;
+    FB.st[k] = 'saving'; fbStatus(k);
+    api('saveFb', { token: S.token, setId: p[0], studentId: p[1], text: v }).then(function (r) {
+      if (r.ok) {
+        if (v === null) delete FB.srv[k]; else FB.srv[k] = r.fb ? r.fb.text : v;
+        if (store_get('fb.' + k) === lv) store_set('fb.' + k, null);   // 그사이 또 고쳤으면 남겨 둠
+        FB.st[k] = 'ok';
+      } else if (/알 수 없는 요청|예전 버전/.test(r.error || '')) {
+        FB.ready = false; FB.st[k] = 'local';
+        if (v === null) store_set('fb.' + k, null);
+      } else if (/찾을 수 없어요/.test(r.error || '')) { store_set('fb.' + k, null); FB.st[k] = ''; }
+      else FB.st[k] = 'err';
+      fbStatus(k);
+    });
+  }, ms);
+}
+// 오늘 결과에 나온 세트의 고친 문장을 서버에서 불러옴(한 번 불러온 세트는 새로고침 전까지 다시 안 부름)
+function fbEnsure(setIds) {
+  var need = setIds.filter(function (id) { return !FB.loaded[id]; });
+  if (!need.length || FB.ready === false) return;
+  need.forEach(function (id) { FB.loaded[id] = 1; });
+  api('fbAll', { token: S.token, setIds: need }).then(function (r) {
+    if (!r.ok) {
+      if (/알 수 없는 요청/.test(r.error || '')) FB.ready = false; else need.forEach(function (id) { delete FB.loaded[id]; });
+      if (FB.ready === false && S.view === 'admin' && A.tab === 'today') fbRerender();
+      return;
+    }
+    FB.ready = !!r.ready;
+    var changed = false;
+    need.forEach(function (id) { Object.keys(FB.srv).forEach(function (k) { if (fbSplit(k)[0] === id) delete FB.srv[k]; }); });
+    (r.fbs || []).forEach(function (f) { FB.srv[f.setId + '.' + f.studentId] = f.text; changed = true; });
+    // 예전 서버 때 이 컴퓨터에만 저장한 문장·저장 못 한 문장을 서버로 올림
+    if (FB.ready && !FB.pushed) {
+      FB.pushed = true;
+      fbLocalKeys().forEach(function (k) { if (A.data && A.data.setById[fbSplit(k)[0]]) { var v = store_get('fb.' + k); fbQueue(k, v === FB_DEL ? null : v, 0); } });
+    }
+    if (changed || FB.ready === false) fbRerender();
+  });
+}
+function fbRerender() {
+  var ae = document.activeElement;
+  if (ae && ae.dataset && ae.dataset.fb !== undefined) return;   // 쓰는 중이면 그대로
+  if (S.view === 'admin' && A.tab === 'today') renderKeep();
+}
+function fbText(r) {
+  var o = fbOwn(r);
+  return o !== undefined ? o : r.sub ? feedbackFor(r.set, r.sub, A.data) : '';
 }
 // 누르면 피드백 칸에 들어가는 선생님 말투 한마디(다시 누르면 빠짐). [묶음, 버튼 이름, 문장] — {편}은 'ㅇㅇ이 편에'
 var FB_CHIPS = [
@@ -2787,10 +2894,15 @@ function fbChipToggle(text, chip) {
   parts.splice(at, 0, chip);
   return parts.join(' ') + smile;
 }
+// 개인 피드백 칸 위 줄(자동/고친 문장 · 저장 상태 · 되돌리기). 쓰는 동안에도 이 줄만 바꿔 그림
+function fblHtml(r, i) {
+  var k = fbKey(r), edited = fbOwn(r) !== undefined, bad = FB.st[k] === 'err' || FB.st[k] === 'local' || (FB.ready === false && edited);
+  return '<div class="fbl"><span>개인 피드백' + (edited ? ' <b>· 고친 문장</b>' : r.sub ? ' · 자동' : ' · 비어 있음') + ' <small class="fbst ' + (bad ? 'badtxt' : 'muted') + '" data-fbst="' + h(k) + '">' + h(fbStatusText(k)) + '</small></span>' + (edited ? '<button class="mini" data-act="fb-reset" data-i="' + i + '">자동 문장으로</button>' : '') + '</div>';
+}
 function fbBox(r, i) {
   if (!A.addFb || (!r.sub && r.n)) return '';
-  var edited = A.fbEdit[fbKey(r)] !== undefined, cur = fbText(r);
-  return '<div class="fbl"><span>개인 피드백' + (edited ? ' <b>· 고친 문장</b>' : r.sub ? ' · 자동' : ' · 비어 있음') + '</span>' + (edited ? '<button class="mini" data-act="fb-reset" data-i="' + i + '">자동 문장으로</button>' : '') + '</div>' +
+  var cur = fbText(r);
+  return fblHtml(r, i) +
     '<textarea data-fb="' + i + '" rows="5" aria-label="' + h(r.st.name) + ' 개인 피드백" placeholder="버튼을 누르거나 직접 쓰면 진행 사항 뒤에 이어져요.">' + h(cur) + '</textarea>' +
     ['칭찬', '짚은 점', '마무리'].map(function (gname) {
       return '<div class="fbgrp"><span>' + gname + '</span><div class="chips fbchips">' + FB_CHIPS.map(function (c, j) {
@@ -2825,7 +2937,7 @@ function smsText(r) {
   if (ex && r.set.evalName) secs.push(['■ ' + r.set.evalName + ' 성취도', '- ' + ex + ' ( A+ / A / B / C / F)']);
   // 학생별 피드백을 넣는 중이어도 입력 없는 세트는 피드백이 없으니 진행 사항 문장을 넣음
   var fb = A.addFb ? fbText(r).trim() : '', note = getNote(r.set).trim();
-  if (absent) { var own = A.addFb && A.fbEdit[fbKey(r)] !== undefined ? String(A.fbEdit[fbKey(r)]).trim() : ''; note = r.extra === '무단' ? '금주 클리닉 결석했습니다. 확인 부탁 드립니다.' : '개인 사정으로 등원 어렵다고 연락 받았습니다. 주말 수업 때 자료 받아갈 수 있도록 할 예정입니다.'; fb = own; }
+  if (absent) { var own0 = A.addFb ? fbOwn(r) : undefined, own = own0 !== undefined ? String(own0).trim() : ''; note = r.extra === '무단' ? '금주 클리닉 결석했습니다. 확인 부탁 드립니다.' : '개인 사정으로 등원 어렵다고 연락 받았습니다. 주말 수업 때 자료 받아갈 수 있도록 할 예정입니다.'; fb = own; }
   if (note || fb) secs.push(['■ 클리닉 진행 사항', '- ' + [note, fb].filter(Boolean).join(' ')]);
   var out = ['[' + fullSchool(r.st.school) + ' ' + exam + ' 대비 내신 클리닉 ' + r.set.week + ']'];
   secs.forEach(function (x) { out.push(''); out.push.apply(out, x); });
@@ -2844,6 +2956,7 @@ function tabToday() {
   if (rows.hidden && rows.hidden.length) html += '<p class="note">문자에서 뺀 지난 세트 ' + rows.hidden.length + '줄: ' + h(rows.hidden.map(function (r) { return r.st.name + '(' + r.st.school + ' ' + r.set.week + ')'; }).join(', ')) + ' — 그 주 기록은 그대로 있고, 이날 숙제 검사만 지난 세트에 찍혀서 이번 주 세트 문자만 보여요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
   var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
+  if (A.addFb) setTimeout(function () { fbEnsure(setsToday.map(function (x) { return x.id; })); }, 0);
   setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
   html += '<section class="sheet stack"><div class="toolbar"><label for="sel-exam">시험</label><select id="sel-exam" class="dateinp">' + ['중간고사', '기말고사'].map(function (x) {
     return '<option' + ((A.exam || '기말고사') === x ? ' selected' : '') + '>' + x + '</option>'; }).join('') + '</select>' +
@@ -3105,7 +3218,7 @@ function onClick(ev) {
         var old2 = /알 수 없는 요청/.test(r.error || '');
         return toast(old2 ? '서버가 아직 예전 버전이라 답을 고칠 수 없어요. 앱스 스크립트에 새 omr 파일을 올려 주세요.' : r.error, true);
       }
-      var fk2 = se2.setId + '.' + se2.studentId; delete A.fbEdit[fk2]; store_set('fb.' + fk2, null);
+      var fk2 = se2.setId + '.' + se2.studentId; delete A.fbEdit[fk2]; store_set('fb.' + fk2, null); delete FB.srv[fk2];
       toast((st2 ? st2.name + ' ' : '') + (set2 ? set2.week + ' ' : '') + '답을 고쳤어요. ' + (r.partial && r.pct !== undefined ? '정답률 ' + pct(r.pctBefore) + ' → ' + pct(r.pct) + ' (완벽히 맞힌 ' + r.before + '개 → ' + r.score + '개)' : r.before + '개 → ' + r.score + '개 맞힘 (' + r.total + '문항)'));
       A.subEdit = null; applyAdmin(r.all);
     });
@@ -3120,7 +3233,7 @@ function onClick(ev) {
         var old = /알 수 없는 요청|예전 버전/.test(r.error || '');
         return toast(old ? '서버가 아직 예전 버전이라 초기화할 수 없어요. 앱스 스크립트에 새 omr 파일을 올려 주세요. 그전에는 구글 시트 subs 탭에서 그 학생 줄을 지우면 돼요.' : r.error, true);
       }
-      var fk = t.dataset.set + '.' + t.dataset.st; delete A.fbEdit[fk]; store_set('fb.' + fk, null);
+      var fk = t.dataset.set + '.' + t.dataset.st; delete A.fbEdit[fk]; store_set('fb.' + fk, null); delete FB.srv[fk];
       toast((rst ? rst.name + ' ' : '') + (rset ? rset.week + ' ' : '') + '답을 지웠어요. 학생이 새로고침하면 다시 낼 수 있어요.');
       applyAdmin(r.all);
     });
@@ -3163,10 +3276,10 @@ function onClick(ev) {
   }
   if (act === 'fb-chip') {
     var r7 = A.todayRows[Number(t.dataset.i)], c7 = FB_CHIPS[Number(t.dataset.c)];
-    if (r7 && c7) { var k7 = fbKey(r7), nt = fbChipToggle(fbText(r7), fbChipText(c7, r7)); A.fbEdit[k7] = nt; store_set('fb.' + k7, nt); }
+    if (r7 && c7) { var k7 = fbKey(r7), nt = fbChipToggle(fbText(r7), fbChipText(c7, r7)); fbSet(k7, nt); }
     return renderKeep();
   }
-  if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) { var k8 = fbKey(r8); delete A.fbEdit[k8]; store_set('fb.' + k8, null); } return renderKeep(); }
+  if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) fbSet(fbKey(r8), null); return renderKeep(); }
   if (act === 'copy-sms') { var i = Number(t.dataset.i); copyText(smsText(A.todayRows[i]), $('#sms-' + i)); return; }
   if (act === 'copy-acad') {
     copyText(JSON.stringify({ v: 1, d: A.day || todayStr(), rows: A.todayRows.map(function (r) { var o = { n: r.st.name, s: fullSchool(r.st.school), m: smsText(r) }; if (rowAbsent(r)) o.a = 1; else { var tt = rowTime(r); if (tt) o.t = tt; } return o; }) }), null);
@@ -3351,7 +3464,7 @@ function onInput(ev) {
   }
   if (ev.target.dataset && ev.target.dataset.fb !== undefined) {
     var i9 = ev.target.dataset.fb, r9 = A.todayRows[Number(i9)];
-    if (r9) { var k9 = fbKey(r9); A.fbEdit[k9] = ev.target.value; store_set('fb.' + k9, ev.target.value); var el9 = $('#sms-' + i9); if (el9) el9.textContent = smsText(r9); }
+    if (r9) { var k9 = fbKey(r9); fbSet(k9, ev.target.value); var el9 = $('#sms-' + i9); if (el9) el9.textContent = smsText(r9); var fl9 = ev.target.previousElementSibling; if (fl9 && fl9.classList.contains('fbl')) fl9.outerHTML = fblHtml(r9, i9); }
     return;
   }
   if (ev.target.dataset && ev.target.dataset.note !== undefined) {
