@@ -1865,12 +1865,12 @@ function setOptions(sel) {
   }).join('');
 }
 
-// 학교 버튼을 나란히, 고른 학교의 주차를 버튼으로(왼쪽부터 오래된 주 → 최근 주)
+// 학교 버튼을 나란히, 고른 학교의 주차를 버튼으로(왼쪽부터 최근 주 → 오래된 주)
 function setPicker(set) {
   var d = A.data, by = {}, school = set ? set.school : A.wkSchool;
   d.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
   var schools = Object.keys(by).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
-  var mine = (by[school] || []).slice().sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+  var mine = (by[school] || []).slice().sort(function (a, b) { return weekOrder(b.week) - weekOrder(a.week) || String(b.createdAt).localeCompare(String(a.createdAt)); });
   return '<div class="setpick"><div class="toolbar"><span class="spl">학교</span><div class="chips">' + schools.map(function (sc) {
       return '<button class="chip' + (sc === school ? ' on' : '') + '" data-act="wk-school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>' +
