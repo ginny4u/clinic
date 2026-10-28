@@ -2522,7 +2522,7 @@ function resultRowsForDay(day, school) {
   var d = A.data, keys = {};
   (d.checks || []).forEach(function (c) { if (localDay(c.checkedAt) === day && ckCame(c)) keys[c.setId + '|' + c.studentId] = 1; });
   d.subs.forEach(function (sb) { if (localDay(sb.submittedAt) === day) keys[sb.setId + '|' + sb.studentId] = 1; });
-  return Object.keys(keys).map(function (k) {
+  var rows = Object.keys(keys).map(function (k) {
     var p = k.split('|'), set = d.setById[p[0]], st = d.stuById[p[1]];
     if (!set || !st) return null;
     if (school && school !== '전체' && st.school !== school) return null;
@@ -2535,6 +2535,17 @@ function resultRowsForDay(day, school) {
     }
     return { extra: ck ? (ck.extra || '') : '', set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, pct: sub && n ? subCredit(items, sub) / n : null, partial: setPartial(items), guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks, blankNos(items, sub), creditMap(items, sub)) : [], blank: sub ? Object.keys(blankNos(items, sub)).length : 0 };
   }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
+  // 같은 학생의 더 새 세트 줄이 있고, 이 줄은 오늘 낸 OMR 없이 숙제 검사만 오늘 바뀐 지난 세트면 뺌
+  var newer = function (a, b) { return weekOrder(a.week) - weekOrder(b.week) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')); };
+  var hidden = [];
+  var kept = rows.filter(function (r) {
+    if (r.sub && localDay(r.sub.submittedAt) === day) return true;
+    var other = rows.some(function (o) { return o !== r && o.st.id === r.st.id && newer(o.set, r.set) > 0; });
+    if (other) hidden.push(r);
+    return !other;
+  });
+  kept.hidden = hidden;
+  return kept;
 }
 var MARK = { A: '○', B: '△', F: '✕', N: '미지참' };
 function fullSchool(sc) { return sc === '경복' ? '경복여고' : /고$/.test(sc) ? sc : sc + '고'; }
@@ -2830,6 +2841,7 @@ function tabToday() {
       return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>';
   html += '<p class="note">이 날짜에 숙제 검사(\'왔음\' 포함)를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
+  if (rows.hidden && rows.hidden.length) html += '<p class="note">문자에서 뺀 지난 세트 ' + rows.hidden.length + '줄: ' + h(rows.hidden.map(function (r) { return r.st.name + '(' + r.st.school + ' ' + r.set.week + ')'; }).join(', ')) + ' — 그 주 기록은 그대로 있고, 이날 숙제 검사만 지난 세트에 찍혀서 이번 주 세트 문자만 보여요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
   var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
   setsToday.sort(function (a, b) { return a.school.localeCompare(b.school, 'ko'); });
