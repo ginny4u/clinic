@@ -2599,6 +2599,8 @@ var FB_TYPE = {
 };
 function fbJosa(w, a, b) { var c = String(w).charCodeAt(String(w).length - 1); return (c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28) ? a : b; }
 function fbWork(w) { return '‘' + w + '’'; }
+// 자동 피드백 마지막 손질: 가운뎃점은 무조건 쉼표로(문항 핵심 개념·작품명에 들어간 것까지), '헷갈려 해,'는 '헷갈려 해서'로
+function fbClean(t) { return String(t || '').replace(/\s*·\s*/g, ', ').replace(/헷갈려 해,\s*/g, '헷갈려 해서 '); }
 // 세트 문항 대부분이 문학이면 '작품', 아니면(문법 등) '주제'
 function fbUnit(items) {
   var c = {}; (items || []).forEach(function (it) { c[it.area || ''] = (c[it.area || ''] || 0) + 1; });
@@ -2616,8 +2618,8 @@ function fbPick(seed, arr) { var x = 0; for (var i = 0; i < seed.length; i++) x 
 // ───── 학부모 개인 피드백 v4: 기본 두 문장 — 그 학생에게 가장 두드러진 한 가지 + 마무리 ─────
 // 같은 세트 학생들끼리 같은 문장이 겹치지 않도록, 표현은 학생 순서(이름순)대로 돌려 가며 고른다.
 // 문항에 핵심 개념(point)이 있으면 그 개념을 그대로 말한다("‘진달래꽃’에서 감정 이입과 직유 구분을 헷갈려 해").
-var FB_NOUN = { L1: '내용 파악', L2: '시어·구절 풀이', L3: '표현상 특징', L4: '화자·인물의 태도', L5: '〈보기〉 적용', L6: '작품 비교', L7: '고전 어휘 풀이',
-  G1: '중세 국어', G2: '품사·단어 짜임', G3: '문장 성분·짜임', G4: '문법 요소', G5: '음운 변동·맞춤법',
+var FB_NOUN = { L1: '내용 파악', L2: '시어, 구절 풀이', L3: '표현상 특징', L4: '화자, 인물의 태도', L5: '〈보기〉 적용', L6: '작품 비교', L7: '고전 어휘 풀이',
+  G1: '중세 국어', G2: '품사, 단어 짜임', G3: '문장 성분, 짜임', G4: '문법 요소', G5: '음운 변동, 맞춤법',
   R1: '세부 내용 확인', R2: '글의 구조 파악', R3: '관점 비교', R4: '문맥적 의미', M1: '자료 분석' };
 var FB_DO = {
   L1: ['작품 흐름을 장면별로 다시 정리해 주었습니다.', '줄거리와 주제를 근거와 함께 다시 짚어 주었습니다.', '작품 내용을 처음부터 차근차근 다시 정리했습니다.'],
@@ -2711,7 +2713,7 @@ function fbCompose(set, sub, d, used, idx) {
     focus = 'perfect';
   } else if (pts.length) {
     var p2 = pts[1] && pts[1].w === pts[0].w ? pts[1] : null, pl = p2 ? p2.p : pts[0].p;
-    first = who + ' ' + fbWork(pts[0].w) + '에서 ' + pts[0].p + (p2 ? ', ' + p2.p : '') + fbJosa(pl, '을', '를') + ' 헷갈려 해, ' + pick('d', FB_DO.P);
+    first = who + ' ' + fbWork(pts[0].w) + '에서 ' + pts[0].p + (p2 ? ', ' + p2.p : '') + fbJosa(pl, '을', '를') + ' 헷갈려 해서 ' + pick('d', FB_DO.P);
     focus = 'weak';
   } else if (weak.length) {
     var w0 = weak[0].w, w2 = !weakType && weak[1] && weak[1].b.x >= weak[0].b.x * 0.7 ? weak[1].w : null;
@@ -2759,7 +2761,7 @@ function fbCompose(set, sub, d, used, idx) {
   else if (acc < 0.5) close = '기본 내용부터 차근차근 다시 다지는 방향으로 지도하고자 합니다.';
   else if (focus === 'high') close = pick('c', ['남은 기간에는 사소한 실수를 줄이는 데 집중하고자 합니다.', '지금 흐름을 ' + exam + '까지 이어 갈 수 있도록 꾸준히 점검하고자 합니다.', '다음 클리닉은 실수 없이 푸는 것을 목표로 해 보기로 했습니다.']);
   else close = pick('c', ['다음 클리닉에서 이 부분을 한 번 더 확인하고자 합니다.', '비슷한 문제로 다시 확인하며 확실히 잡아 두고자 합니다.', '이 부분은 다음 주에도 이어서 점검하고자 합니다.', '시험 전까지 이 부분을 중점적으로 보완하는 방향으로 지도하고자 합니다.']);
-  return [first, mid, close].filter(Boolean).join(' ');
+  return fbClean([first, mid, close].filter(Boolean).join(' '));
 }
 
 function fbKey(r) { return r.set.id + '.' + r.st.id; }
@@ -2877,7 +2879,7 @@ var FB_ASK_RE = /(부탁 드립니다!|좋을 것 같습니다\.|감사하겠습
 var FB_END_RE = /(고자 합니다\.|기로 했습니다\.|하원했습니다\.)(\^\^)?$/;
 function fbChipText(c, r) {
   var g = String(r.st.name || '').trim(); g = g.length >= 4 ? g.slice(-2) : g.length >= 2 ? g.slice(1) : g;
-  return c[2].replace('{편}', g + fbJosa(g, '이', '') + ' 편에');
+  return fbClean(c[2].replace('{편}', g + fbJosa(g, '이', '') + ' 편에'));
 }
 function fbChipOn(text, chip) { return chip === '^^' ? /\^\^$/.test(text) : text.indexOf(chip) >= 0; }
 // 한마디를 넣거나 뺀다. 칭찬·짚은 점은 마무리(다짐·하원) 문장 앞에, 하원 문장은 학부모님께 부탁하는 문장 앞에, 부탁은 맨 끝에.
