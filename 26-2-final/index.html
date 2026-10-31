@@ -481,7 +481,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 15;
+var CORE_VERSION = 16;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -706,7 +706,7 @@ function prFocus(w, weeks) {
   });
   return { area: best.area, rate: Math.round(best.r * 100), works: works,
     weeks: weeks.map(function (x) {
-      if (x.status !== 'done') return { w: x.week, s: x.status };
+      if (x.status !== 'done') { var o = { w: x.week, s: x.status }; if (x.status === 'absent' && x.came) o.c = 1; return o; }
       var b = prAreaCount(x.cells)[best.area];
       return { w: x.week, s: 'done', v: b ? b.x : null };
     }) };
@@ -750,7 +750,7 @@ function parentReportFor(store, st) {
   if (!weeks.length) { out.none = true; return out; }
   var i = weeks.length - 1, w = weeks[i];
   out.week = w.week; out.status = w.status; out.n = w.n;
-  out.bars = weeks.map(function (x) { return { w: x.week, s: x.status, v: x.status === 'absent' ? null : x.score }; });
+  out.bars = weeks.map(function (x) { var b = { w: x.week, s: x.status, v: x.status === 'absent' ? null : x.score }; if (x.status === 'absent' && x.came) b.c = 1; return b; });
   if (w.status === 'absent') {
     out.came = !!w.came;
     var j = i - 1; while (j >= 0 && weeks[j].status === 'absent') j--;
@@ -3668,7 +3668,7 @@ function prBarsHtml(bars) {
   var n = bars.length, many = n > 6, gap = many ? 4 : n > 5 ? 6 : 12;
   return '<p class="pr-cap">개강 후 정답률</p><div class="' + (many ? 'pr-many' : '') + '"><div class="pr-bars" style="gap: ' + gap + 'px">' + bars.map(function (b, i) {
     var last = i === n - 1, hh = b.v ? Math.round(b.v * 1.05) : 0;
-    if (b.s === 'absent') return '<div class="pr-bar abs"><span>결석</span></div>';
+    if (b.s === 'absent') return '<div class="pr-bar abs"><span>' + (b.c ? '미제출' : '결석') + '</span></div>';
     if (b.s === 'partial') return '<div class="pr-bar part"><span>미완료</span><i style="height: ' + hh + 'px"></i></div>';
     return '<div class="pr-bar' + (last ? ' last' : '') + '"><span>' + (many ? Math.round(b.v) : prNum(b.v)) + '%</span><i style="height: ' + hh + 'px"></i></div>';
   }).join('') + '</div><div class="pr-wk" style="gap: ' + gap + 'px">' + bars.map(function (b) { return '<span>' + h(many ? String(b.w).replace(/주$/, '') : b.w) + '</span>'; }).join('') + '</div></div>';
@@ -3680,7 +3680,7 @@ function prFocusHtml(r, f, absent) {
   if (r.bars.length > 1) {
     var many = false, grid = f.weeks.length > 6;   // 주가 많으면 5칸씩 두 줄로
     html += '<p class="pr-cap s">개강 후 오답 수</p><div class="pr-fw' + (grid ? ' grid' : '') + '" style="gap: 6px">' + f.weeks.map(function (x) {
-      var top = x.s === 'absent' ? '<em>결석</em>' : x.s === 'partial' ? '<em class="p">미완료</em>' : x.v === null ? '<em>–</em>' : '<b>' + x.v + '개</b>';
+      var top = x.s === 'absent' ? '<em>' + (x.c ? '미제출' : '결석') + '</em>' : x.s === 'partial' ? '<em class="p">미완료</em>' : x.v === null ? '<em>–</em>' : '<b>' + x.v + '개</b>';
       return '<div>' + top + '<small>' + h(many ? String(x.w).replace(/주$/, '') : x.w) + '</small></div>';
     }).join('') + '</div>';
   }
