@@ -511,7 +511,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 17;
+var CORE_VERSION = 18;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -786,8 +786,10 @@ function parentReportFor(store, st) {
     if (!w.came) {
       var cutA = setCutoff(w.set, w.subsSet), subA = {};
       w.subsSet.forEach(function (sb) { subA[sb.studentId] = 1; });
-      out.absentN = all.filter(function (s) {
-        if (s.school !== st.school || (s.status !== 'active' && s.id !== st.id) || subA[s.id] || String(s.joinedAt || '') > cutA) return false;
+      var inWeek = all.filter(function (s) { return s.school === st.school && (s.status === 'active' || s.id === st.id) && (subA[s.id] || String(s.joinedAt || '') <= cutA); });
+      out.absentOf = inWeek.length;   // 그 주 재원생(그 주에 다닌 학생) 수
+      out.absentN = inWeek.filter(function (s) {
+        if (subA[s.id]) return false;
         var c = checks.filter(function (x) { return x.setId === w.set.id && x.studentId === s.id; })[0];
         return !(c && (Object.keys(c.grades || {}).length > 0 || (!!c.extra && c.extra !== '결석' && c.extra !== '무단')));
       }).length;
@@ -3804,7 +3806,7 @@ function prReportHtml(r) {
   if (absent) {
     html += r.came ? '<span class="pr-big gray">미제출</span><p class="pr-p">' + h(r.week) + ' 클리닉 확인 테스트를 제출하지 않아 기록이 없습니다.</p>'
       : '<span class="pr-big gray">결석</span><p class="pr-p">개인 사정으로 등원하지 못해 ' + h(r.week) + ' 클리닉 기록이 없습니다.</p>' +
-        (r.absentN ? '<p class="pr-p">이번 주 ' + h(school) + '에서 클리닉에 결석한 학생은 <span style="white-space: nowrap">총 ' + r.absentN + '명</span>입니다.</p>' : '');
+        (r.absentN ? '<p class="pr-p">이번 주 ' + h(school) + ' 재원생 ' + (r.absentOf ? '<span style="white-space: nowrap">' + r.absentOf + '명 중</span> ' : '') + '클리닉에 결석한 학생은 <span style="white-space: nowrap">' + r.absentN + '명</span>입니다.</p>' : '');
   } else {
     var d = r.delta, dl = d ? (d.last ? '지난주보다' : d.w + '보다') : '';
     html += '<div class="pr-row"><span class="pr-big">' + prNum(r.score) + '%</span>' +
