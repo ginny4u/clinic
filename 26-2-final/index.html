@@ -2661,6 +2661,13 @@ function resultRowsForDay(day, school) {
     if (other) hidden.push(r);
     return !other;
   });
+  kept.forEach(function (r) {
+    var ts = [];
+    if (r.sub && localDay(r.sub.submittedAt) === day) ts.push(String(r.sub.submittedAt));
+    if (r.ck && r.ck.checkedAt && localDay(r.ck.checkedAt) === day) ts.push(String(r.ck.checkedAt));
+    r.at = ts.sort().pop() || '';
+  });
+  kept.sort(function (a, b) { return b.at.localeCompare(a.at) || a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
   kept.hidden = hidden;
   return kept;
 }
@@ -3046,7 +3053,7 @@ function tabToday() {
     '<div class="chips">' + ['전체'].concat(d.schools).map(function (sc) {
       return '<button class="chip ' + (A.school === sc ? 'on' : '') + '" data-act="school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>';
-  html += '<p class="note">이 날짜에 숙제 검사(\'왔음\' 포함)를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
+  html += '<p class="note">이 날짜에 숙제 검사(\'왔음\' 포함)를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 최근에 제출한 학생이 맨 위에 있어요. 학생마다 만들어진 문자를 복사해서 학원관리시스템에 붙여 넣으면 돼요.</p>';
   if (rows.hidden && rows.hidden.length) html += '<p class="note">문자에서 뺀 지난 세트 ' + rows.hidden.length + '줄: ' + h(rows.hidden.map(function (r) { return r.st.name + '(' + r.st.school + ' ' + r.set.week + ')'; }).join(', ')) + ' — 그 주 기록은 그대로 있고, 이날 숙제 검사만 지난 세트에 찍혀서 이번 주 세트 문자만 보여요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
   var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
