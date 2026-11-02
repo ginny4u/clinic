@@ -113,6 +113,30 @@ textarea { resize: vertical; }
 .bar-v { text-align: right; font-family: var(--f-num); font-variant-numeric: tabular-nums; font-size: 14px; display: flex; flex-direction: column; line-height: 1.2; letter-spacing: 0;}
 .bar-v small { color: var(--muted); font-size: 12px; }
 .bar.few { opacity: 0.55; }
+.kpis .kcap { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.4; }
+.wk-list { display: flex; flex-direction: column; border-top: 1px solid var(--line-strong); margin: 8px 0 10px; }
+.wk-row { display: grid; grid-template-columns: 4.4em minmax(0, 1fr) 3.2em 6.6em; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.wk-row.now { background: linear-gradient(90deg, rgba(37, 87, 224, 0.06), transparent); }
+.wk-w { font-weight: 600; display: flex; flex-direction: column; line-height: 1.2; }
+.wk-w small { font-weight: 400; color: #2557e0; font-size: 12px; }
+.wk-t { height: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; }
+.wk-t i { display: block; height: 100%; background: #2557e0; border-radius: 5px; }
+.wk-v { text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.wk-r { text-align: right; color: var(--muted); font-size: 14px; white-space: nowrap; }
+.wk-r b { color: var(--ink); }
+.wk-row.off { grid-template-columns: 4.4em 1fr; }
+.wk-off { color: var(--muted); font-size: 14px; }
+.ms-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.ms-top { display: flex; align-items: baseline; gap: 6px; }
+.ms-top small { color: var(--muted); font-size: 12px; }
+.ms-v { margin-left: auto; font-weight: 600; color: var(--bad); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ms-t { height: 10px; background: var(--paper); border: 1px solid var(--line); border-radius: 5px; overflow: hidden; margin: 6px 0 4px; }
+.ms-t i { display: block; height: 100%; background: var(--accent); border-radius: 5px; }
+.ms-sub { font-size: 12px; color: var(--muted); }
+.ms-sub em { font-style: normal; }
+.ms-sub em.worse { color: var(--bad); font-weight: 600; }
+.ms-sub em.better { color: var(--ok); }
+.ms-row.few { opacity: 0.7; }
 
 .spark svg { width: 100%; max-width: 520px; height: auto; display: block; }
 .spark .grid { stroke: var(--line); stroke-width: 1; }
@@ -1548,6 +1572,68 @@ function myBar(label, b, classRate, sub) {
     '<div class="bar-t"><i style="width:' + Math.max(2, r * 100) + '%"></i>' + (cr === null ? '' : '<b class="avg" style="left:' + (cr * 100) + '%" title="학교 평균 ' + pct(cr) + '"></b>') + '</div>' +
     '<div class="bar-v">' + pct(r) + '<small>' + fmtX(b.x + b.g) + '/' + b.n + '</small></div></div>';
 }
+
+/* ---------- 학생 첫 화면: 내 위치 · 주차별 기록 · 자주 틀리는 곳 ---------- */
+function homeWeekPct(s) { return s.partial && s.pct !== null && s.pct !== undefined ? s.pct : s.total ? s.score / s.total : 0; }
+function homeWeekRows(sets, rk) {
+  var rs = (rk && rk.sets) || {};
+  var list = sets.filter(function (s) { return s.total; })
+    .sort(function (a, b) { return weekOrder(b.week) - weekOrder(a.week) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')); });
+  if (!list.length) return '';
+  return '<div class="wk-list">' + list.map(function (s, i) {
+    var r = rs[s.id], now = s.open;
+    var rank = rankShown(r) ? r.of + '명 중 <b>' + r.rank + '등</b>' : r && (r.few || r.pending) ? '등수 집계 중' : '';
+    if (!s.submitted) {
+      var why = now ? '아직 안 냄' : r ? '미제출 · 꼴찌로 계산' : '합류 전';
+      return '<div class="wk-row off' + (now ? ' now' : '') + '"><span class="wk-w">' + h(s.week) + (now ? '<small>이번 주</small>' : '') + '</span><span class="wk-off">' + why + '</span></div>';
+    }
+    var p = homeWeekPct(s);
+    return '<div class="wk-row' + (now ? ' now' : '') + '"><span class="wk-w">' + h(s.week) + (now ? '<small>이번 주</small>' : '') + '</span>' +
+      '<span class="wk-t"><i style="width:' + Math.max(2, Math.round(p * 100)) + '%"></i></span>' +
+      '<span class="wk-v">' + pct(p) + '</span><span class="wk-r">' + rank + '</span></div>';
+  }).join('') + '</div>';
+}
+function homeMissRows(list, cls, guess) {
+  return list.map(function (o) {
+    var r = rate(o.b), cr = cls ? cls[o.key] : undefined, sub = o.sub || '';
+    var cmp = cr === undefined || cr === null ? '' : r - cr >= 0.05 ? '<em class="worse">우리 학교 평균(' + pct(cr) + ')보다 많이 틀려요</em>'
+      : r - cr <= -0.05 ? '<em class="better">우리 학교 평균(' + pct(cr) + ')보다 적게 틀려요</em>' : '<em>우리 학교 평균(' + pct(cr) + ')과 비슷해요</em>';
+    return '<div class="ms-row' + (o.b.n < 5 ? ' few' : '') + '"><div class="ms-top"><b>' + h(o.label) + '</b>' + (sub ? '<small>' + h(sub) + '</small>' : '') +
+      '<span class="ms-v">' + pct(r) + ' ' + (guess ? '틀림·찍음' : '틀림') + '</span></div>' +
+      '<div class="ms-t"><i style="width:' + Math.max(2, Math.round(r * 100)) + '%"></i></div>' +
+      '<div class="ms-sub">' + o.b.n + '문제 중' + (o.b.n < 5 ? ' (문제가 적어서 참고만)' : '') + (cmp ? ' · ' + cmp : '') + '</div></div>';
+  }).join('');
+}
+// 많이 틀린 순 3개: 문제 5개 넘게 푼 것부터, 모자라면 3개 이상 푼 것으로 채움
+function homeTop3(bucket) {
+  var big = sortedRates(bucket, 5).filter(function (o) { return o.r > 0; });
+  if (big.length >= 3) return big.slice(0, 3);
+  var seen = {}; big.forEach(function (o) { seen[o.key] = 1; });
+  return big.concat(sortedRates(bucket, 3).filter(function (o) { return !seen[o.key] && o.r > 0; })).slice(0, 3);
+}
+function homeStatsHtml(me, sets, rk, cls, entries, st) {
+  var html = '';
+  if (entries.length) {
+    var ov = rk.overall, acc = st.total.n ? (st.total.n - st.total.x) / st.total.n : 0;
+    html += '<section class="block"><h2>내 위치</h2><div class="kpis">' +
+      '<div><span>지금까지 정답률</span><strong class="num">' + pct(acc) + '</strong><small class="kcap">지금까지 낸 클리닉 ' + entries.length + '번(문제 ' + st.total.n + '개)을 모두 합쳐서</small></div>' +
+      '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지만 공개</small>' : '–')) + '</strong><small class="kcap">지금까지 모든 주를 합친 등수</small></div></div>' +
+      rankUpNote() + '</section>';
+  } else html += '<section class="block"><h2>내 위치</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 등수와 자주 틀리는 곳이 여기에 나타납니다.</p></section>';
+  var wk = entries.length || sets.some(function (x) { return x.total && !x.open; }) ? homeWeekRows(sets, rk) : '';   // 아직 낸 것도 지난 주도 없으면 '이번 주' 칸과 겹치니 생략
+  if (wk) html += '<section class="block"><h2>주차별 기록</h2><p class="note">한 주에 한 줄씩, 그 주 문제의 정답률이에요. <b>파란 막대가 길수록 잘 본 거예요.</b></p>' + wk +
+    '<p class="note">등수는 같은 학교 재원생끼리 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p></section>';
+  if (entries.length) {
+    var guess = hasGuess(HOME.history);
+    var tr = homeTop3(st.type).map(function (o) { return { key: o.key, b: o.b, label: TYPES[o.key] || o.key, sub: areaOfType(o.key) }; });
+    var wr = homeTop3(st.work).map(function (o) { return { key: o.key, b: o.b, label: o.key }; });
+    var L = 0, X = 0; entries.forEach(function (e) { (e.items || []).forEach(function (it) { if (it.area === '문학') L = 1; else X = 1; }); });
+    if (tr.length || wr.length) html += '<section class="block"><h2>자주 틀리는 곳</h2><p class="note">지금까지 낸 문제를 모두 모아서, 많이 틀린 순서로 3개씩 보여 줘요. <b>빨간 막대가 길수록 많이 틀린 거예요.</b>' + (guess ? ' 틀린 문제와 찍어서 맞힌 문제를 합쳐서 셌어요.' : '') + '</p>' +
+      (tr.length ? '<h3>유형</h3>' + homeMissRows(tr, cls, guess) : '') +
+      (wr.length ? '<h3>' + (L && X ? '작품·영역' : X ? '영역' : '작품') + '</h3>' + homeMissRows(wr, null, guess) : '') + '</section>';
+  }
+  return html;
+}
 function viewHome() {
   var me = HOME.me, sets = HOME.sets, rk = HOME.ranks || {}, cls = HOME.classRates || {};
   var open = sets.filter(function (s) { return s.open; }), closed = sets.filter(function (s) { return !s.open; });
@@ -1564,25 +1650,7 @@ function viewHome() {
       '<span class="chip ' + (s.submitted ? 'ok' : 'todo') + '">' + (s.submitted ? ['제출 완료', s.partial && s.pct !== null && s.pct !== undefined ? '정답률 ' + pct(s.pct) + ' · 완벽히 맞힌 ' + s.score + '/' + s.total : s.total + '문항 중 ' + s.score + '개 맞힘'].concat(rankShown(r) ? [r.of + '명 중 ' + r.rank + '등'] : r && r.few ? ['등수 집계 중'] : []).map(function (x) { return '<span class="nw">' + x + '</span>'; }).join(' · ') : '아직 안 냄 · ' + s.total + '문항') + '</span></button>';
   }).join('') + '</div></section>';
 
-  if (entries.length) {
-    var ov = rk.overall, acc = st.total.n ? (st.total.n - st.total.x) / st.total.n : 0;
-    html += '<section class="block"><h2>내 위치</h2><div class="kpis">' +
-      '<div><span>누적 정답률</span><strong class="num">' + pct(acc) + '</strong></div>' +
-      '<div><span>' + h(me.school) + ' 재원생 중</span><strong class="num">' + (rankShown(ov) ? ov.rank + '<small>등 / ' + ov.of + '명</small>' : (ov ? '<small>' + rankCut(ov.of) + '등까지 공개</small>' : '–')) + '</strong></div>' +
-      '<div><span>제출한 클리닉</span><strong class="num">' + entries.length + '<small>회 · 총 ' + st.total.n + '문항</small></strong></div></div>' +
-      rankUpNote() + '<p class="note">등수는 같은 학교 재원생 전체로 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p>' + trend(entries) + '</section>';
-    var tr = sortedRates(st.type, 3).slice(0, 5), wr = sortedRates(st.work, 3).slice(0, 5);
-    html += '<section class="block"><h2>계속 틀리는 곳</h2><p class="note">' + (hasGuess(HOME.history) ? '틀린 문제와 찍어서 맞힌 문제를 합친 비율입니다.' : '틀린 문제의 비율입니다.') + ' 막대 위 세로선은 우리 학교 평균이에요.</p>' +
-      '<div class="two"><div><h3>유형</h3>' + tr.map(function (o) { return myBar(TYPES[o.key] || o.key, o.b, cls[o.key], areaOfType(o.key)); }).join('') + '</div>' +
-      '<div><h3>' + (function () { var L = 0, X = 0; entries.forEach(function (e) { (e.items || []).forEach(function (it) { if (it.area === '문학') L = 1; else X = 1; }); }); return L && X ? '작품·영역' : X ? '영역' : '작품'; })() + '</h3>' + wr.map(function (o) { return myBar(o.key, o.b); }).join('') + '</div></div></section>';
-  } else html += '<section class="block"><h2>내 위치</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 등수와 자주 틀리는 곳이 여기에 나타납니다.</p></section>';
-  if (closed.length) {
-    html += '<section class="block"><h2>지난 클리닉</h2><div class="rows">' + closed.map(function (s) {
-      var r = rk.sets && rk.sets[s.id];
-      if (!s.total) return '<div class="row past"><span>' + h(s.week) + '</span><span></span><span class="num muted">입력 없음</span></div>';
-      return '<div class="row past"><span>' + h(s.week) + '</span><span>' + (s.submitted ? (rankShown(r) ? r.of + '명 중 ' + r.rank + '등' : '') : (r && (r.few || r.pending) ? '' : r ? '꼴찌로 계산' : '합류 전')) + '</span><span class="num">' + (s.submitted ? (s.partial && s.pct !== null && s.pct !== undefined ? '정답률 ' + pct(s.pct) : s.total + '문항 중 ' + s.score + '개 맞힘') : (r ? '미제출' : '–')) + '</span></div>';
-    }).join('') + '</div></section>';
-  }
+  html += homeStatsHtml(me, sets, rk, cls, entries, st);
   return html + '</main>';
 }
 function trend(entries) {
