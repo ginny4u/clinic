@@ -203,6 +203,7 @@ textarea { resize: vertical; }
 .btn.primary.arm { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .subnote { margin: 4px 0 0; min-height: 2.8em; }
 .good { color: var(--ok); font-weight: 600; margin: 6px 0; }
+.soso { color: var(--warn); font-weight: 600; margin: 6px 0; }
 .subnote.armed { color: var(--accent); font-weight: 600; }
 .mytag { font-size: 12px; border: 1px solid var(--bad); color: var(--bad); padding: 0 5px; border-radius: 3px; margin-left: 6px; white-space: nowrap; }
 .tally { display: flex; align-items: baseline; gap: 12px; justify-content: flex-end; border-top: 1px solid var(--line-strong); padding-top: 10px; flex-wrap: wrap; }
@@ -1739,7 +1740,14 @@ function rankUpNote() {
   if (done.length < 2) return '';
   var a = rs[done[done.length - 2].id], b = rs[done[done.length - 1].id];
   var pa = a.of > 1 ? (a.rank - 1) / (a.of - 1) : 0, pb = b.of > 1 ? (b.rank - 1) / (b.of - 1) : 0;
-  if (pb >= pa) return '';
+  if (pb === pa) return '';
+  if (pb > pa) {
+    // 내려간 경우: 지금 등수가 숫자로 공개되는 학생만(하위권은 등수를 숨기는 것과 같은 이유로 말하지 않음)
+    if (!rankShown(b)) return '';
+    var down = b.rank - a.rank, last = done[done.length - 1];
+    var when = last.open ? '다음 주에' : HOME.sets.some(function (s) { return s.open && s.total && !s.submitted; }) ? '이번 주에' : '다음 주에';
+    return '<p class="soso">지난번보다 ' + (down > 0 ? down + '계단 ' : '조금 ') + '내려갔어요. ' + when + ' 다시 올려 봐요!</p>';
+  }
   var up = a.rank - b.rank;
   return '<p class="good">지난번보다 ' + (up > 0 ? up + '계단 ' : '') + '올라갔어요!</p>';
 }
