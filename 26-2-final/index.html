@@ -126,6 +126,9 @@ textarea { resize: vertical; }
 .wk-r { text-align: right; color: var(--muted); font-size: 14px; white-space: nowrap; }
 .wk-r b { color: var(--ink); }
 .wk-row.off { grid-template-columns: 4.4em 1fr; }
+.wk-btn { grid-template-columns: 4.4em minmax(0, 1fr) 3.2em 6.6em 0.8em; width: 100%; background: none; border: 0; border-bottom: 1px solid var(--line); font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.wk-btn:hover, .wk-btn:focus-visible { background: var(--paper); }
+.wk-go { color: var(--muted); font-size: 18px; line-height: 1; text-align: right; }
 .wk-off { color: var(--muted); font-size: 14px; }
 .ms-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
 .ms-top { display: flex; align-items: baseline; gap: 6px; }
@@ -456,6 +459,14 @@ body.parent .busybar { background: #2557E0; }
 .pr-foot b { font-size: 14px; font-weight: 700; }
 .pr-foot b span { color: #2557E0; }
 .pr-foot small { font-size: 12px; color: #5B6577; }
+.pr-weeks { padding: 12px 16px 10px; }
+.pr-weeks > span { display: block; font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+.pr-wchips { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 2px; }
+.pr-wchip { flex: none; border: 1px solid #d1d5db; background: #fff; color: #111827; border-radius: 999px; padding: 6px 12px; font: inherit; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; }
+.pr-wchip small { font-size: 11px; color: #2557e0; }
+.pr-wchip.on { background: #111827; color: #fff; border-color: #111827; }
+.pr-wchip.on small { color: #c7d2fe; }
+.pr-wnote { margin: 6px 0 0; font-size: 12px; color: #b45309; }
 .pr-out { text-align: center; padding: 0 20px 40px; font-size: 13px; color: #5B6577; }
 .pr-link { background: none; border: none; padding: 6px 4px; color: #2557E0; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
 .pr-peek { background: #182033; color: #FFFFFF; font-size: 13px; line-height: 1.5; padding: 8px 16px; text-align: center; }
@@ -512,7 +523,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 18;
+var CORE_VERSION = 19;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -752,7 +763,7 @@ function prMisses(w) {
 }
 // 학부모 리포트를 세기 시작하는 주차(학교별). 이 주차 앞의 세트는 학부모 리포트에서만 뺀다(베타 주차)
 var PR_START = { '명덕': '10.3주', '경복': '10.3주', '동양': '10.4주', '공항': '10.4주', '한서': '10.4주' };
-function parentReportFor(store, st) {
+function parentReportFor(store, st, upto) {
   var im = itemsMap(store), all = store.students(), subsAll = store.subs(), checks = store.checks ? store.checks() : [];
   var mates = {}; all.forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
   mates[st.id] = 1;
@@ -779,6 +790,11 @@ function parentReportFor(store, st) {
   });
   var out = { name: st.name, school: st.school };
   if (!weeks.length) { out.none = true; return out; }
+  // 지난 주 리포트: 고른 주까지만 놓고 그 주가 '이번 주'인 것처럼 계산(비교·배지·나아진 부분 모두 그 시점 기준)
+  out.weeksAll = weeks.map(function (x) { return { id: x.set.id, w: x.week }; });
+  var cutW = upto ? weeks.map(function (x) { return x.set.id; }).indexOf(String(upto)) : -1;
+  if (cutW >= 0) weeks = weeks.slice(0, cutW + 1);
+  out.sel = weeks[weeks.length - 1].set.id; out.latest = weeks.length === out.weeksAll.length;
   var i = weeks.length - 1, w = weeks[i];
   out.week = w.week; out.status = w.status; out.n = w.n;
   out.bars = weeks.map(function (x) { var b = { w: x.week, s: x.status, v: x.status === 'absent' ? null : x.score }; if (x.status === 'absent' && x.came) b.c = 1; return b; });
@@ -1265,7 +1281,7 @@ var CORE_ACTIONS = {
     if (!id) return fail('로그인 시간이 지났습니다. 다시 로그인해 주세요.');
     var st = store.students().filter(function (s) { return s.id === id; })[0];
     if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
-    var rep = parentReportFor(store, st); rep.ok = true;
+    var rep = parentReportFor(store, st, req.setId ? String(req.setId) : null); rep.ok = true;
     return rep;
   },
 
@@ -1601,9 +1617,9 @@ function homeWeekRows(sets, rk) {
       return '<div class="wk-row off' + (now ? ' now' : '') + '"><span class="wk-w">' + h(s.week) + (now ? '<small>이번 주</small>' : '') + '</span><span class="wk-off">' + why + '</span></div>';
     }
     var p = homeWeekPct(s);
-    return '<div class="wk-row' + (now ? ' now' : '') + '"><span class="wk-w">' + h(s.week) + (now ? '<small>이번 주</small>' : '') + '</span>' +
+    return '<button type="button" class="wk-row wk-btn' + (now ? ' now' : '') + '" data-act="open-set" data-id="' + h(s.id) + '" aria-label="' + h(s.week) + ' 결과 보기"><span class="wk-w">' + h(s.week) + (now ? '<small>이번 주</small>' : '') + '</span>' +
       '<span class="wk-t"><i style="width:' + Math.max(2, Math.round(p * 100)) + '%"></i></span>' +
-      '<span class="wk-v">' + pct(p) + '</span><span class="wk-r">' + rank + '</span></div>';
+      '<span class="wk-v">' + pct(p) + '</span><span class="wk-r">' + rank + '</span><span class="wk-go" aria-hidden="true">›</span></button>';
   }).join('') + '</div>';
 }
 function homeMissRows(list, cls, guess) {
@@ -1634,7 +1650,7 @@ function homeStatsHtml(me, sets, rk, cls, entries, st) {
       rankUpNote() + '</section>';
   } else html += '<section class="block"><h2>내 위치</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 등수와 자주 틀리는 곳이 여기에 나타납니다.</p></section>';
   var wk = entries.length || sets.some(function (x) { return x.total && !x.open; }) ? homeWeekRows(sets, rk) : '';   // 아직 낸 것도 지난 주도 없으면 '이번 주' 칸과 겹치니 생략
-  if (wk) html += '<section class="block"><h2>주차별 기록</h2><p class="note">한 주에 한 줄씩, 그 주 문제의 정답률이에요. <b>파란 막대가 길수록 잘 본 거예요.</b></p>' + wk +
+  if (wk) html += '<section class="block"><h2>주차별 기록</h2><p class="note">한 주에 한 줄씩, 그 주 문제의 정답률이에요. <b>파란 막대가 길수록 잘 본 거예요.</b> 줄을 누르면 그 주에 문제별로 맞고 틀린 것과 정답을 다시 볼 수 있어요.</p>' + wk +
     '<p class="note">등수는 같은 학교 재원생끼리 매기고, 학교 인원의 상위 60%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p></section>';
   if (entries.length) {
     var guess = hasGuess(HOME.history);
@@ -1846,13 +1862,13 @@ function viewDone() {
     var st0 = calc([{ items: F.items, marks: F.marks, skip: sk0, credit: creditFromDetail(rr.detail) }]), nb0 = Object.keys(sk0).length;
     var top0 = sortedRates(st0.type, 2).filter(function (o) { return o.r > 0; }).slice(0, 3);
     return '<main>' + masthead(h(F.set.title), 'sm') + '<div class="stack-lg"><div class="sheet stack">' + (rr.partial && rr.pct !== undefined ? '<div class="big num">' + pct(rr.pct) + '<small> 정답률</small></div><p class="note">완벽히 맞힌 문항 ' + rr.score + ' / ' + rr.total + ' · 정답을 일부만 찾은 문항은 찾은 만큼 점수에 들어가요.</p>' : '<div class="big num">' + rr.score + '<small> / ' + rr.total + '</small></div>') + (nb0 ? '<p class="note">안 푼 ' + nb0 + '문항은 틀린 것으로 계산했어요.</p>' : '') +
-      (top0.length ? '<h3>이번 주 많이 틀린 유형</h3>' + top0.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '') + '</div>' +
+      (top0.length ? '<h3>' + (F.set.open === false ? h(F.set.week) + '에' : '이번 주') + ' 많이 틀린 유형</h3>' + top0.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '') + '</div>' +
       resultBlocks(rr) + '<div class="actions"><button class="btn primary" data-act="home">내 위치 보러 가기</button></div></div></main>';
   }
   var r = F.result, st = calc([{ items: F.items, marks: F.marks }]);
   var top = sortedRates(st.type, 2).filter(function (o) { return o.r > 0; }).slice(0, 3);
-  return '<main class="narrow">' + masthead('제출이 완료되었습니다.') + '<div class="stack-lg"><div class="sheet stack"><div class="big num">' + r.score + '<small> / ' + r.total + '</small></div>' +
-    (top.length ? '<h3>이번 주 많이 틀린 유형</h3>' + top.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '<p class="note">이번 주에는 특별히 약한 유형이 없습니다.</p>') +
+  return '<main class="narrow">' + masthead(F.set.open === false ? h(F.set.title) : '제출이 완료되었습니다.') + '<div class="stack-lg"><div class="sheet stack"><div class="big num">' + r.score + '<small> / ' + r.total + '</small></div>' +
+    (top.length ? '<h3>' + (F.set.open === false ? h(F.set.week) + '에' : '이번 주') + ' 많이 틀린 유형</h3>' + top.map(function (o) { return barRow(TYPES[o.key], o.b); }).join('') : '<p class="note">이번 주에는 특별히 약한 유형이 없습니다.</p>') +
     '</div>' + resultBlocks(r) + '<div class="actions"><button class="btn primary" data-act="home">내 위치 보러 가기</button></div></div></main>';
 }
 
@@ -3720,7 +3736,8 @@ function prClick(ev) {
   var a = t.dataset.pr;
   if (a === 'back') { PR.view = 'login'; PR.err = ''; prRender(); return; }
   if (a === 'pick') { PR.pick = { id: t.dataset.id, label: t.dataset.label }; PR.view = 'pw'; PR.err = ''; prRender(); return; }
-  if (a === 'logout') { store_set('ptoken', null); PR.token = null; PR.peek = false; PR.pv = null; PR.rep = null; PR.view = 'login'; PR.err = ''; prRender(); window.scrollTo(0, 0); return; }
+  if (a === 'logout') { store_set('ptoken', null); PR.token = null; PR.peek = false; PR.pv = null; PR.rep = null; PR.sel = null; PR.view = 'login'; PR.err = ''; prRender(); window.scrollTo(0, 0); return; }
+  if (a === 'week') { var all = (PR.rep && PR.rep.weeksAll) || []; PR.sel = all.length && all[all.length - 1].id === t.dataset.id ? null : t.dataset.id; prLoad(); return; }
   if (a === 'save') { prSaveImage(t); return; }
 }
 function prSubmit(ev) {
@@ -3755,6 +3772,7 @@ function prSubmit(ev) {
 }
 function prLoad() {
   var req = PR.pv ? { token: PR.pv.token, studentId: PR.pv.sid } : { token: PR.token };
+  if (PR.sel) req.setId = PR.sel;
   api('parentReport', req).then(function (r) {
     if (!r.ok) {
       if (!PR.pv) { store_set('ptoken', null); PR.token = null; }
@@ -3793,6 +3811,15 @@ function prFocusHtml(r, f, absent) {
   }).join('') + '</div></section>';
   return html;
 }
+
+// 주차 고르기(리포트 카드 위, 이미지 저장에는 안 들어감)
+function prWeeksHtml(r) {
+  var all = r.weeksAll || [];
+  if (all.length < 2) return '';
+  return '<div class="pr-weeks"><span>주차별 리포트</span><div class="pr-wchips">' + all.slice().reverse().map(function (x, k) {
+    return '<button type="button" class="pr-wchip' + (x.id === r.sel ? ' on' : '') + '" data-pr="week" data-id="' + h(x.id) + '"' + (x.id === r.sel ? ' aria-pressed="true"' : '') + '>' + h(x.w) + (k === 0 ? '<small>최신</small>' : '') + '</button>';
+  }).join('') + '</div>' + (r.latest ? '' : '<p class="pr-wnote">지난 리포트를 보고 있어요. ' + h(r.weeksAll[r.weeksAll.length - 1].w) + ' 최신 리포트는 맨 앞 버튼을 눌러 주세요.</p>') + '</div>';
+}
 function prReportHtml(r) {
   var given = prGiven(r.name), nameGen = prJosa(given, '이의', '의'), nameSubj = prJosa(given, '이가', '가'), school = fullSchool(r.school);
   var star = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"></path></svg>';
@@ -3806,7 +3833,7 @@ function prReportHtml(r) {
       '<footer class="pr-foot"><b>' + h(school) + ' 1학년 담당 강사 배진희 <span>♥</span></b><small>리포트는 매주 클리닉 최종 마감 후 갱신됩니다.</small></footer></div>' + out + '</div>';
   }
   var absent = r.status === 'absent', partial = r.status === 'partial', hasHist = r.bars.length > 1;
-  var html = bar + '<div class="pr"><div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span><span class="pr-pill">최종 마감</span></div>' +
+  var html = bar + '<div class="pr">' + prWeeksHtml(r) + '<div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span><span class="pr-pill">최종 마감</span></div>' +
     '<div class="pr-title"><h1 class="pr-h1">' + h(nameGen) + ' ' + h(r.week) + '</h1>' + (r.badge ? '<span class="pr-badge">' + star + '<span>' + h(school) + ' 재원생 상위 ' + r.badge + '%</span></span>' : '') + '</div>' +
     '<p class="pr-sub">' + h(school) + ' 1학년 · ' + h(r.week) + ' 클리닉 최종 마감 기준</p></header><main class="pr-main">';
   // 이번 주 기록 / 정답률
