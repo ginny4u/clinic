@@ -2930,6 +2930,18 @@ function weakTypesOf(items, marks, skip, credit) {
   var c = calc([{ items: items, marks: marks, skip: skip, credit: credit }]);
   return sortedRates(c.type, 1).filter(function (o) { return o.b.x + o.b.g >= 1.5; }).slice(0, 2).map(function (o) { return TYPES[o.key]; });
 }
+// 오늘 결과에서 선생님이 뺀 줄: { 날짜: { '세트|학생': 1 } }. 브라우저 저장이 막히면 이 창에서만 기억
+var TODAY_HIDE_MEM = {};
+function todayHideAll() { var o = null; try { o = JSON.parse(localStorage.getItem('clinicTodayHide') || 'null'); } catch (e) { o = null; } return o && typeof o === 'object' ? o : TODAY_HIDE_MEM; }
+function todayHideGet(day) { return todayHideAll()[day] || {}; }
+function todayHideSet(day, key, on) {
+  var o = todayHideAll(), m = o[day] || (o[day] = {});
+  if (on) m[key] = 1; else delete m[key];
+  if (!Object.keys(m).length) delete o[day];
+  Object.keys(o).sort().slice(0, -14).forEach(function (k) { delete o[k]; });   // 최근 14일치만
+  TODAY_HIDE_MEM = o;
+  try { localStorage.setItem('clinicTodayHide', JSON.stringify(o)); } catch (e) {}
+}
 function resultRowsForDay(day, school) {
   var d = A.data, keys = {};
   (d.checks || []).forEach(function (c) { if (localDay(c.checkedAt) === day && ckCame(c)) keys[c.setId + '|' + c.studentId] = 1; });
@@ -2963,7 +2975,9 @@ function resultRowsForDay(day, school) {
     r.at = ts.sort().pop() || '';
   });
   kept.sort(function (a, b) { return b.at.localeCompare(a.at) || a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
-  kept.hidden = hidden;
+  var man = todayHideGet(day), manual = [];
+  kept = kept.filter(function (r) { if (man[r.set.id + '|' + r.st.id]) { manual.push(r); return false; } return true; });
+  kept.hidden = hidden; kept.manual = manual;
   return kept;
 }
 var MARK = { A: '○', B: '△', F: '✕', N: '미지참' };
@@ -3353,6 +3367,9 @@ function tabToday() {
     '<label class="inline"><input type="checkbox" id="chk-fb"' + (A.addFb ? ' checked' : '') + '> 학생별 피드백 넣기</label></div>';
   html += '<p class="note">이 날짜에 숙제 검사(\'왔음\' 포함)를 받았거나 점검표를 낸 학생 ' + rows.length + '명. 최근에 제출한 학생이 맨 위에 있어요.</p>';
   if (rows.hidden && rows.hidden.length) html += '<p class="note">문자에서 뺀 지난 세트 ' + rows.hidden.length + '줄: ' + h(rows.hidden.map(function (r) { return r.st.name + '(' + r.st.school + ' ' + r.set.week + ')'; }).join(', ')) + ' — 그 주 기록은 그대로 있고, 이날 숙제 검사만 지난 세트에 찍혀서 이번 주 세트 문자만 보여요.</p>';
+  if (rows.manual && rows.manual.length) html += '<p class="note">오늘 목록에서 뺀 줄 ' + rows.manual.length + '개: ' + rows.manual.map(function (r) {
+    return h(r.st.name + '(' + r.st.school + ' ' + r.set.week + ')') + ' <button class="link" data-act="today-unhide" data-k="' + h(r.set.id + '|' + r.st.id) + '">되돌리기</button>'; }).join(', ') +
+    ' · 문자와 학원관리시스템용 복사에서도 빠져요. 제출 기록은 그대로예요.</p>';
   if (!rows.length) return html + '<p class="empty">이 날짜에 들어온 결과가 없어요.</p>';
   var setsToday = []; rows.forEach(function (r) { if (setsToday.indexOf(r.set) < 0) setsToday.push(r.set); });
   if (A.addFb) setTimeout(function () { fbEnsure(setsToday.map(function (x) { return x.id; })); }, 0);
@@ -3369,12 +3386,13 @@ function tabToday() {
     '<p class="note"><b>"클리닉 결과 넣기" 북마크 만들기 · 새로 바꾸기</b></p><p class="note">웨일·크롬 모두 Ctrl + Shift + B를 누르면 북마크 바가 켜져요. 아래 빨간 버튼을 마우스로 끌어서 북마크 바에 놓으면 끝이에요. 끌어지지 않으면 "코드 복사"를 누르고, 북마크 바 빈 곳에서 마우스 오른쪽 → 북마크 추가(페이지 추가) → 이름은 "클리닉 결과 넣기", 주소(URL) 칸에 붙여 넣고 저장하세요.</p>' +
     '<p class="note">북마크를 새 것으로 바꿀 때는 북마크 바의 예전 "클리닉 결과 넣기"를 마우스 오른쪽 → 삭제한 뒤, 아래 버튼을 다시 끌어다 놓아 주세요.</p>' +
     '<div class="actions" style="justify-content:flex-start"><a class="btn primary bm" href="' + h(BOOKMARKLET_HREF) + '" onclick="return false">클리닉 결과 넣기</a><button class="btn" data-act="copy-bm">코드 복사</button></div>', '학원관리시스템에 넣는 법 · 북마크', false) + '</section>';
-  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th>약한 유형</th></tr></thead><tbody>' +
+  html += '<div class="tscroll"><table class="t"><thead><tr><th>이름</th><th>학교·주차</th><th>숙제 (항목 순서대로)</th><th class="r">정답 수</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th>약한 유형</th><th></th></tr></thead><tbody>' +
     rows.map(function (r) {
       return '<tr><td><button class="link" data-act="detail" data-id="' + r.st.id + '">' + h(r.st.name) + '</button></td><td class="muted">' + h(r.st.school + ' · ' + r.set.week) + '</td>' +
         '<td class="num">' + (!r.set.homework.length ? '<span class="muted">없음</span>' : r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + (v === 'N' ? ' 미지참' : '') + '">' + (v === 'N' ? '미' : MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
         '<td class="r num">' + (!r.n ? '<span class="muted">입력 없음</span>' : r.sub ? (r.partial ? pct(r.pct) + ' <small class="muted">완벽 ' + r.score + '/' + r.n + '</small>' : r.score + '/' + r.n) + (r.blank ? ' <small class="muted">안 푼 ' + r.blank + '</small>' : '') : '<span class="badtxt">미제출</span>') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + (r.sub ? r.guess : '') + '</td>' : '') +
-        '<td>' + h(gradeOnly(r.extra)) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td></tr>';
+        '<td>' + h(gradeOnly(r.extra)) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td>' +
+        '<td class="acts"><button class="mini" data-act="today-hide" data-k="' + h(r.set.id + '|' + r.st.id) + '" title="오늘 목록·문자·학원관리시스템용 복사에서 빼요. 제출 기록은 그대로예요.">빼기</button></td></tr>';
     }).join('') + '</tbody></table></div>';
   html += '<div class="smslist">' + rows.map(function (r, i) {
     return '<div class="sms"><div class="block-h"><strong>' + h(r.st.name) + ' <small class="muted">' + h(r.st.school) + '</small></strong><button class="mini" data-act="copy-sms" data-i="' + i + '">복사</button></div><pre id="sms-' + i + '" data-school="' + h(r.st.school) + '">' + h(smsText(r)) + '</pre>' + fbBox(r, i) + '</div>';
@@ -3675,6 +3693,7 @@ function onClick(ev) {
     return renderKeep();
   }
   if (act === 'fb-reset') { var r8 = A.todayRows[Number(t.dataset.i)]; if (r8) fbSet(fbKey(r8), null); return renderKeep(); }
+  if (act === 'today-hide' || act === 'today-unhide') { todayHideSet(A.day || todayStr(), t.dataset.k, act === 'today-hide'); return renderKeep(); }
   if (act === 'copy-sms') { var i = Number(t.dataset.i); copyText(smsText(A.todayRows[i]), $('#sms-' + i)); return; }
   if (act === 'copy-acad') {
     copyText(JSON.stringify({ v: 1, d: A.day || todayStr(), rows: A.todayRows.map(function (r) { var o = { n: r.st.name, s: fullSchool(r.st.school), m: smsText(r) }; if (rowAbsent(r)) o.a = 1; else { var tt = rowTime(r); if (tt) o.t = tt; } return o; }) }), null);
