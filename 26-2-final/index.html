@@ -259,6 +259,12 @@ textarea { resize: vertical; }
 .heat-t td.heat small { color: var(--muted); font-size: 12px; font-family: var(--f-num); letter-spacing: 0;}
 .heat-t td.few { opacity: 0.5; }
 .heat-t td.empty-c { color: var(--muted); text-align: center; }
+.trend-t th.c, .heat-t th.c { text-align: center; }
+.heat-t th.tl { text-align: left; font-weight: 500; white-space: nowrap; color: var(--ink); font-size: 14px; border-bottom: 1px solid var(--line); }
+.heat-t th.tl small { font-weight: 400; font-size: 12px; }
+.trend-t td.tot { border-left: 2px solid var(--line); }
+.tr-good { color: var(--ok); font-size: 12px; }
+.tr-bad { color: var(--bad); font-size: 12px; }
 .hwstat { display: flex; gap: 12px; flex-wrap: wrap; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--line); }
 .hwstat small { flex-basis: 100%; color: var(--muted); }
 .badtxt { color: var(--bad); }
@@ -1706,12 +1712,25 @@ function trend(entries) {
 
 /* ---------- 학생: 점검표 작성 ---------- */
 var F = null;
+
+/* ---------- 뒤로 가기 ---------- */
+function navPush(tag) { try { if (!history.state || history.state.app !== tag) history.pushState({ app: tag }, ''); } catch (e) { } }
+function navBack(tag, fallback) { try { if (history.state && history.state.app === tag) { history.back(); return; } } catch (e) { } fallback(); }
+window.addEventListener('popstate', function (e) {
+  var tag = e.state && e.state.app;
+  if ((S.view === 'form' || S.view === 'done') && tag !== 'set') {
+    if (S.view === 'form' && F && F.sending) { navPush('set'); toast('제출하는 중이에요. 잠깐만 기다려 주세요.'); return; }
+    loadHome(); return;
+  }
+  if (typeof A !== 'undefined' && A && A.detail && tag !== 'modal') { A.detail = null; render(); }
+});
 function openSet(id) {
   api('getSet', { token: S.token, setId: id }).then(function (r) {
     if (!r.ok) return toast(r.error, true);
     var sub = r.sub;
     F = { set: r.set, items: r.items, marks: sub ? Object.assign({}, sub.marks) : {}, follow: sub ? Object.assign({}, sub.follow) : {},
       check: r.check, resubmit: !!sub, err: '', omr: setIsOmr(r.items), picks: {}, sure: false, armedAt: 0 };
+    navPush('set');
     if (F.omr && r.result) { F.result = r.result; dropDraft(); return setView('done'); }
     if (F.omr) loadDraft();
     setView('form');
@@ -2088,7 +2107,7 @@ function entriesFor(filterFn) {
 function heat(b) {
   if (!b || !b.n) return '<td class="heat empty-c">–</td>';
   var r = rate(b);
-  return '<td class="heat' + (b.n < 5 ? ' few' : '') + '" style="--r:' + Math.min(1, r * 1.6).toFixed(2) + '"><b>' + pct(r) + '</b><small>' + b.n + '</small></td>';
+  return '<td class="heat' + (b.n < 5 ? ' few' : '') + '" style="--r:' + Math.min(1, r * 1.6).toFixed(2) + '" title="' + b.n + '문제 중 ' + pct(r) + ' 틀림"><b>' + pct(r) + '</b><small>' + b.n + '문제 중</small></td>';
 }
 /* ---------- 내신 현황: 주차별 색칸 ---------- */
 // 기본 9주(10.3주~12.2주) + 세트에 다른 주차(10.3주 이후)가 있으면 그 주도 칸으로
@@ -2354,6 +2373,41 @@ function tabStudents() {
     }).join('') + '</tbody></table></div>';
   return html;
 }
+
+/* ---------- 학생 상세: 주차별 추이 ---------- */
+// 표 읽는 법: 이 학생 표에서 실제 칸 하나를 예로 들어 설명
+function stuTrendNote(weeks, types) {
+  var ex = null;
+  types.some(function (o) { return weeks.some(function (w) { var b = w.c.type[o.key]; if (b && b.n >= 5) { ex = { w: w.set.week, t: TYPES[o.key] || o.key, n: b.n, r: pct(rate(b)) }; return true; } }); });
+  return '<p class="note"><b>오답률</b>은 그 유형 문제 가운데 틀린 비율이에요(오답 중의 비율이 아니에요).' +
+    (ex ? ' 예를 들어 ' + h(ex.w) + ' ' + h(ex.t) + ' 칸의 <b>' + ex.n + '문제 중 ' + ex.r + '</b>는 그 주 ' + h(ex.t) + ' ' + ex.n + '문제에서 ' + ex.r + '를 틀렸다는 뜻이에요.' : '') +
+    ' 무한선지는 부분 점수라서 정답을 반만 찾은 문제는 반 문제 틀린 것으로 셉니다. 칸이 진할수록 많이 틀린 거고, 흐린 칸은 문제가 5개 미만이라 참고만 하세요. 맨 오른쪽 \'전체\'는 모든 주를 합친 값이에요.</p>';
+}
+function stuTrendHtml(st, sm) {
+  var d = A.data;
+  var weeks = sm.ents.map(function (e) { return { set: d.setById[e.setId], c: calc([e]) }; }).filter(function (w) { return w.set; })
+    .sort(function (a, b) { return weekOrder(a.set.week) - weekOrder(b.set.week) || String(a.set.createdAt || '').localeCompare(String(b.set.createdAt || '')); });
+  var types = sortedRates(sm.calc.type, 3).slice(0, 8);
+  if (!types.length) return '<div><h3>유형별 오답률 <small class="muted">주차별</small></h3><p class="empty">아직 푼 문제가 적어서(한 유형에 3문제 미만) 표로 보여 줄 게 없어요.</p></div>';
+  var html = '<div><h3>유형별 오답률 <small class="muted">주차별</small></h3>' +
+    stuTrendNote(weeks, types) +
+    '<div class="tscroll"><table class="t heat-t trend-t"><thead><tr><th>유형</th>' + weeks.map(function (w) { return '<th class="c">' + h(w.set.week) + '</th>'; }).join('') + '<th class="c">전체</th></tr></thead><tbody>' +
+    types.map(function (o) {
+      var label = TYPES[o.key] || o.key, ar = areaOfType(o.key);
+      var vals = weeks.map(function (w) { return w.c.type[o.key]; }).filter(function (b) { return b && b.n; });
+      var tr = '';
+      if (vals.length >= 2) { var dlt = rate(vals[vals.length - 1]) - rate(vals[vals.length - 2]); tr = dlt <= -0.1 ? '<span class="tr-good" title="지난번보다 덜 틀림">▼</span>' : dlt >= 0.1 ? '<span class="tr-bad" title="지난번보다 더 틀림">▲</span>' : ''; }
+      return '<tr><th class="tl">' + h(label) + (ar ? ' <small class="muted">' + h(ar) + '</small>' : '') + ' ' + tr + '</th>' +
+        weeks.map(function (w) { return heat(w.c.type[o.key]); }).join('') + heat(o.b).replace('<td class="heat', '<td class="heat tot') + '</tr>';
+    }).join('') + '</tbody></table></div></div>';
+  var works = sortedRates(sm.calc.work, 2).slice(0, 8);
+  if (works.length) html += '<div><h3>작품별 오답률</h3><div class="tscroll"><table class="t heat-t"><thead><tr><th>작품</th><th>나온 주</th><th class="c">오답률</th></tr></thead><tbody>' +
+    works.map(function (o) {
+      var wk = weeks.filter(function (w) { return w.c.work[o.key]; }).map(function (w) { return w.set.week; });
+      return '<tr><th class="tl">' + h(o.key) + '</th><td class="muted">' + h(wk.join(', ')) + '</td>' + heat(o.b) + '</tr>';
+    }).join('') + '</tbody></table></div></div>';
+  return html;
+}
 function studentModal(id) {
   var d = A.data, st = d.stuById[id]; if (!st) return '';
   var sm = studentSummary(st);
@@ -2366,13 +2420,12 @@ function studentModal(id) {
     var x = 0, g = 0, q = [];
     Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; else g++; });
     var nb = Object.keys(blankNos(d.items[set.id] || [], sub)).length;
-    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (setPartial(d.items[set.id] || []) ? pct(n ? subCredit(d.items[set.id] || [], sub) / n : 0) + ' <small class="muted">' + (n - x) + '/' + n + '</small>' : (n - x) + '/' + n) + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + editBtn(set, id) + resetBtn(set, id) + '</td></tr>';
+    return '<tr><td>' + h(set.week) + '</td><td class="r num">' + (setPartial(d.items[set.id] || []) ? pct(n ? subCredit(d.items[set.id] || [], sub) / n : 0) + ' <small class="muted">완벽히 맞힌 문항 ' + (n - x) + '/' + n + '</small>' : (n - x) + '/' + n + '문항') + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + g + '</td>' : '') + '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + editBtn(set, id) + resetBtn(set, id) + '</td></tr>';
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
     '<div class="block-h"><h2>' + h(st.name) + ' <small>' + h(st.school) + '</small></h2><button class="link" data-act="close-modal">닫기</button></div>' +
-    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">맞힌</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th></th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
-    (sm.n ? '<div class="two"><div><h3>유형</h3>' + sortedRates(sm.calc.type, 3).slice(0, 7).map(function (o) { return barRow(TYPES[o.key], o.b, areaOfType(o.key)); }).join('') + '</div>' +
-      '<div><h3>작품</h3>' + sortedRates(sm.calc.work, 3).slice(0, 7).map(function (o) { return barRow(o.key, o.b); }).join('') + '</div></div>' : '<p class="empty">제출 기록이 없어요.</p>') +
+    '<div class="tscroll"><table class="t"><thead><tr><th>주차</th><th class="r">정답률</th>' + (hasGuess(d.subs) ? '<th class="r">찍맞</th>' : '') + '<th>추가 평가</th><th></th></tr></thead><tbody>' + hist + '</tbody></table></div>' +
+    (sm.n ? stuTrendHtml(st, sm) : '<p class="empty">제출 기록이 없어요.</p>') +
     '</div></div>';
 }
 
@@ -3268,7 +3321,7 @@ function onClick(ev) {
   if (act === 'back-login') { L.err = ''; setView('login'); return; }
   if (act === 'pick') { L.pick = { id: id, label: t.dataset.label }; L.err = ''; setView('pw'); return; }
   if (act === 'logout') { logout(); return; }
-  if (act === 'home') { if (S.view === 'form' && F && F.sending) { toast('제출하는 중이에요. 잠깐만 기다려 주세요.'); return; } loadHome(); return; }
+  if (act === 'home') { if (S.view === 'form' && F && F.sending) { toast('제출하는 중이에요. 잠깐만 기다려 주세요.'); return; } navBack('set', loadHome); return; }
   if (act === 'open-set') { openSet(id); return; }
   if (F && S.view === 'form') {
     keepMsg();
@@ -3408,8 +3461,8 @@ function onClick(ev) {
   if (act === 'copy-all') { copyText(A.todayRows.map(smsText).join('\n\n'), null); return; }
   if (act === 'toggle-q') { A.showAllQ = !A.showAllQ; return render(); }
   if (act === 'toggle-items') { A.showAllItems = !A.showAllItems; return render(); }
-  if (act === 'detail') { A.detail = id; return render(); }
-  if (act === 'close-modal') { A.detail = null; return render(); }
+  if (act === 'detail') { A.detail = id; navPush('modal'); return render(); }
+  if (act === 'close-modal') { navBack('modal', function () { A.detail = null; render(); }); return; }
   if (act === 'st-op') {
     var op = t.dataset.op;
     if (op !== 'return' && !(A.confirm && A.confirm.id === id && A.confirm.op === op)) { A.confirm = { id: id, op: op }; return render(); }
@@ -3981,7 +4034,7 @@ function boot() {
   document.addEventListener('input', onInput);
   document.addEventListener('submit', onSubmitSafe);
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape' && A.detail) { A.detail = null; render(); }
+    if (e.key === 'Escape' && A.detail) { navBack('modal', function () { A.detail = null; render(); }); }
     if (e.target && e.target.id === 'in-ckq' && (e.key === 'Enter' || e.key === 'Escape') && !e.isComposing) { e.preventDefault(); A.ckQ = ''; e.target.value = ''; ckResort(); }
   });
   setInterval(syncAdmin, 60000);
