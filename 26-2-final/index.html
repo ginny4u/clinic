@@ -604,7 +604,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 21;
+var CORE_VERSION = 22;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -778,7 +778,7 @@ function setStats(store, set, items, meId, fresh, subsList) {
   var doneIds = {}; subs.forEach(function (s) { doneIds[s.studentId] = 1; });
   var cut = setCutoff(set, subs);
   var absent = store.students().filter(function (s) { return mates[s.id] && !doneIds[s.id] && String(s.joinedAt) <= cut; }).length;
-  return { count: subs.length, of: subs.length + absent, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v + 1e-9; }).length : null, items: per,
+  return { count: subs.length, of: set.open ? subs.length : subs.length + absent, live: !!set.open, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v + 1e-9; }).length : null, items: per,
     few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
 
@@ -1052,8 +1052,11 @@ var CORE_ACTIONS = {
       Object.keys(mates).forEach(function (id) { if (!done[id] && String(stuById[id].joinedAt) <= cut) list.push({ id: id, v: -1 }); });
       // 진행 중인 주는 min(5명, 그 학교 인원)이 낼 때까지 등수·누적에 넣지 않음
       if (openSet[set.id] && subsHere.length < Math.min(RANK_MIN, list.length)) { setRanks[set.id] = { few: true, count: subsHere.length }; return; }
-      var r = rankOf(list, st.id);
-      if (r) { if (!done[st.id]) { if (openSet[set.id]) r = { pending: true }; else r.absent = true; } setRanks[set.id] = r; }
+      // 진행 중인 주는 낸 학생끼리 등수(live). 마감하면 안 낸 학생을 꼴찌로 넣어 다시 매김
+      var r = rankOf(openSet[set.id] ? subsHere : list, st.id);
+      if (openSet[set.id] && !done[st.id]) r = { pending: true };
+      else if (r) { if (openSet[set.id]) r.live = true; else if (!done[st.id]) r.absent = true; }
+      if (r) setRanks[set.id] = r;
       list.forEach(function (o) {
         if (o.v < 0 && openSet[set.id]) return;   // 진행 중인 주에 아직 안 낸 학생은 누적에 넣지 않음
         var w = weekly[o.id] || (weekly[o.id] = { n: 0, sum: 0 }); w.n++; w.sum += Math.max(0, o.v);
@@ -1740,7 +1743,7 @@ function homeCard(s, r, up) {
   var head = '<span class="card-k">' + h(weekWithDate(s.week, s.createdAt)) + '</span>' + (cardTitleShown(s) ? '<strong>' + h(s.title) + '</strong>' : '');
   if (!s.submitted) return '<button class="card" data-act="open-set" data-id="' + h(s.id) + '">' + head + '<span class="chip todo">아직 안 냄 · ' + s.total + '문항</span><span class="cd-go">풀러 가기 ›</span></button>';
   var p = homeWeekPct(s);
-  var rank = rankShown(r) ? r.of + '명 중 <b>' + r.rank + '등</b>' : r && (r.few || r.pending) ? '등수 집계 중' : '';
+  var rank = rankShown(r) ? (r.live ? '지금까지 낸 ' : '') + r.of + '명 중 <b>' + r.rank + '등</b>' : r && (r.few || r.pending) ? '등수 집계 중' : '';
   return '<button class="card done" data-act="open-set" data-id="' + h(s.id) + '">' + head +
     '<span class="cd-l"><span class="cd-k">점수</span><span><b class="cd-v">' + p100(p) + '점</b> (100점 만점)</span></span>' +
     '<span class="cd-l"><span class="cd-k">선지를 하나도 안 틀린 문제</span><span>' + s.total + '문제 중 ' + s.score + '개</span></span>' +
@@ -1793,7 +1796,7 @@ function homeStatsHtml(me, sets, rk, cls, entries, st, upTop) {
   var html = '';
   var wk = homeWeekRows(sets, rk);
   if (wk) html += '<section class="block"><h2>주차별</h2>' + (upTop ? rankUpNote('p') : '') + wk +
-    '<p class="note">줄을 누르면 그 주 결과를 다시 볼 수 있어요. 등수는 같은 학교 재원생끼리 매기고, 상위 ' + Math.round(RANK_SHOW * 100) + '%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p></section>';
+    '<p class="note">줄을 누르면 그 주 결과를 다시 볼 수 있어요. 등수는 같은 학교 재원생끼리 매기고, 상위 ' + Math.round(RANK_SHOW * 100) + '%까지만 숫자로 보여요. 이번 주 등수는 ' + RANK_MIN + '명 이상 내면 나오고, 마감 전에는 낸 학생끼리 매겨요. 마감할 때까지 내지 않으면 그 주는 꼴찌로 계산해요.</p></section>';
   else if (!entries.length) html += '<section class="block"><h2>주차별</h2><p class="empty">아직 제출한 클리닉이 없습니다. 클리닉을 제출하면 주마다 정답률과 등수가 여기에 나타납니다.</p></section>';
   if (entries.length) html += homeStudy(sets, entries);
   return html;
@@ -1909,8 +1912,12 @@ function rankCut(of) { return Math.max(1, Math.floor(of * RANK_SHOW)); }
 function rankShown(r) { return !!r && !r.absent && r.rank <= rankCut(r.of); }
 function rankUpInfo() {
   var rs = (HOME && HOME.ranks && HOME.ranks.sets) || {};
-  var done = HOME.sets.filter(function (s) { var r = rs[s.id]; return r && !r.absent && r.rank; })
+  var ranked = HOME.sets.filter(function (s) { var r = rs[s.id]; return r && !r.absent && r.rank; })
     .sort(function (a, b) { return String(a.createdAt).localeCompare(String(b.createdAt)); });
+  // 진행 중인 주는 아직 낸 학생끼리의 등수라 지난 주와 비교하지 않음(마감 뒤에 비교)
+  var live = function (s) { return s.open || rs[s.id].live; };
+  if (ranked.length && live(ranked[ranked.length - 1])) return null;
+  var done = ranked.filter(function (s) { return !live(s); });
   if (done.length < 2) return null;
   var A0 = done[done.length - 2], B0 = done[done.length - 1], a = rs[A0.id], b = rs[B0.id];
   var pa = a.of > 1 ? (a.rank - 1) / (a.of - 1) : 0, pb = b.of > 1 ? (b.rank - 1) / (b.of - 1) : 0;
@@ -1993,7 +2000,7 @@ function resultBlocks(r) {
     var wrongN = function (o) { return o.miss || 0; };
     var top = st.items.filter(function (o) { return wrongN(o) > 0; }).sort(function (a, b) { return wrongN(b) - wrongN(a) || b.rate - a.rate || a.no - b.no; }).slice(0, 5);
     html += '<section class="sheet"><h2>우리 학교 이번 주 <small>' + st.count + '명 제출</small></h2>' +
-      (st.rank && rankShown({ rank: st.rank, of: st.of || st.count }) ? '<div class="kpis"><div><span>이번 주 등수</span><strong class="num">' + st.rank + '<small>등 / ' + (st.of || st.count) + '명</small></strong></div></div>'
+      (st.rank && rankShown({ rank: st.rank, of: st.of || st.count }) ? '<div class="kpis"><div><span>이번 주 등수' + (st.live ? ' (마감 전)' : '') + '</span><strong class="num">' + st.rank + '<small>등 / ' + (st.live ? '낸 ' : '') + (st.of || st.count) + '명</small></strong></div></div>'
         : st.rank ? '<p class="note">이번 주 등수는 ' + rankCut(st.of || st.count) + '등까지 공개돼요. 다음 주에 도전해 보세요!</p>' : '') +
       (function () { var got = top.filter(function (o) { return !mine[o.no]; }).length; return top.length && got ? '<p class="good">많이 틀린 문항 ' + top.length + '개 중 ' + got + '개를 맞혔어요!</p>' : ''; })() +
       '<h3>많이 틀린 문항</h3>' + (top.length ? top.map(function (o) {
@@ -2570,8 +2577,9 @@ function stuWeekRank(set, sid) {
   subs.forEach(function (x) { by[x.studentId] = subCredit(items, x) / n; });
   var list = d.students.filter(function (s) { return s.school === set.school && (s.status === 'active' || by[s.id] !== undefined) && (by[s.id] !== undefined || String(s.joinedAt || '') <= cut); })
     .map(function (s) { return { id: s.id, v: by[s.id] !== undefined ? by[s.id] : -1 }; });
+  if (set.open) list = list.filter(function (o) { return o.v >= 0; });   // 진행 중인 주는 낸 학생끼리
   var me = list.filter(function (o) { return o.id === sid; })[0]; if (!me || me.v < 0) return null;
-  return { rank: 1 + list.filter(function (o) { return o.v > me.v + 1e-9; }).length, of: list.length };
+  return { rank: 1 + list.filter(function (o) { return o.v > me.v + 1e-9; }).length, of: list.length, live: !!set.open };
 }
 // 주차별 틀린 문항: 행 = 단원(문법은 작품 칸 그대로 '상위 > 세부', 그 밖은 첫 유형), 열 = 주차(최신이 왼쪽)
 // 칸 = 받은 점수 / 만점(정렬은 잃은 점수 큰 순). 그 주에 가장 많이 잃은 칸(3문항 이상)은 굵게. 안 나온 주는 '–', 3문항 미만은 회색. 칸을 누르면 그 주 그 단원의 틀린 번호가 아래 한 줄로
@@ -2636,7 +2644,7 @@ function studentModal(id) {
     var x = 0; Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; });
     var nb = Object.keys(blankNos(items, sub)).length, cr = subCredit(items, sub), rk = stuWeekRank(set, id);
     return '<tr>' + wl + '<td class="r num nw">' + pct(cr / n) + ' <small class="muted">(' + ptxt(cr) + '/' + n + '점)</small>' + (nb ? ' <small class="muted">안 푼 ' + nb + '</small>' : '') + '</td>' +
-      '<td class="r num nw">' + (n - x) + '/' + n + '문제</td><td class="r num nw">' + (rk ? rk.rank + '등 <small class="muted">/ ' + rk.of + '명</small>' : '') + '</td>' +
+      '<td class="r num nw">' + (n - x) + '/' + n + '문제</td><td class="r num nw">' + (rk ? rk.rank + '등 <small class="muted">/ ' + (rk.live ? '낸 ' : '') + rk.of + '명</small>' : '') + '</td>' +
       '<td>' + h(gradeOnly(extraOf(set.id, id))) + '</td><td class="acts">' + editBtn(set, id) + resetBtn(set, id) + '</td></tr>';
   }).join('');
   return '<div class="overlay" data-act="close-modal"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + '" data-stop="1">' +
