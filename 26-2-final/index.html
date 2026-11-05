@@ -1990,7 +1990,7 @@ function resultBlocks(r) {
   } else if (st && st.count) {
     var mine = {}; (r.detail || []).forEach(function (d) { if (d.wrong) mine[d.no] = d.blank ? 'b' : 1; });
     if (!r.detail && F && F.marks) Object.keys(F.marks).forEach(function (k) { if (F.marks[k] === 'X') mine[k] = 1; });
-    var wrongN = function (o) { return (o.miss || 0) + (o.blank || 0); };
+    var wrongN = function (o) { return o.miss || 0; };
     var top = st.items.filter(function (o) { return wrongN(o) > 0; }).sort(function (a, b) { return wrongN(b) - wrongN(a) || b.rate - a.rate || a.no - b.no; }).slice(0, 5);
     html += '<section class="sheet"><h2>우리 학교 이번 주 <small>' + st.count + '명 제출</small></h2>' +
       (st.rank && rankShown({ rank: st.rank, of: st.of || st.count }) ? '<div class="kpis"><div><span>이번 주 등수</span><strong class="num">' + st.rank + '<small>등 / ' + (st.of || st.count) + '명</small></strong></div></div>'
@@ -1998,7 +1998,7 @@ function resultBlocks(r) {
       (function () { var got = top.filter(function (o) { return !mine[o.no]; }).length; return top.length && got ? '<p class="good">많이 틀린 문항 ' + top.length + '개 중 ' + got + '개를 맞혔어요!</p>' : ''; })() +
       '<h3>많이 틀린 문항</h3>' + (top.length ? top.map(function (o) {
         return '<div class="res"><b>' + o.no + '</b><span>' + h(o.work) + (mine[o.no] === 'b' ? '<span class="mytag blanktag">안 푼 문항</span>' : mine[o.no] ? '<span class="mytag">나도 틀림</span>' : '') + '</span>' +
-          '<span class="ra">' + st.count + '명 중 ' + wrongN(o) + '명 틀림' + (o.blank ? '(안 푼 ' + o.blank + '명 포함)' : '') + (o.topOpts && o.topOpts.length ? ' · 많이 헷갈린 선지 ' + o.topOpts.map(function (t) { return numc(t[0]); }).join(' ') : '') + '</span></div>';
+          '<span class="ra">' + (o.blank ? '푼 ' + (st.count - o.blank) : '낸 ' + st.count) + '명 중 ' + wrongN(o) + '명 틀림' + (o.topOpts && o.topOpts.length ? ' · 많이 헷갈린 선지 ' + o.topOpts.map(function (t) { return numc(t[0]); }).join(' ') : '') + '</span></div>';
       }).join('') : '<p class="note">아직 틀린 학생이 없어요.</p>') +
       '<p class="note">친구들이 더 제출하면 등수와 틀린 사람 수가 바뀌어요. 다시 열면 새로 계산돼요.</p></section>';
   }
