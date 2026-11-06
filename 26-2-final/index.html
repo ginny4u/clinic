@@ -1782,7 +1782,7 @@ function homeStudy(sets, entries) {
     var k = groupKeyOf(it), g = groups[k] || (groups[k] = { k: k, n: 0, loss: 0, subs: {}, subN: {}, nos: [] }), loss = homeLoss(it, e);
     var sk = it.area === '문법' ? unitSub(it) : it.work;
     g.n++; g.loss += loss; if (sk) g.subN[sk] = (g.subN[sk] || 0) + 1;
-    if (loss > 1e-9) { g.nos.push(it.no); if (sk) g.subs[sk] = (g.subs[sk] || 0) + loss; }
+    if (loss > 1e-9) { if (loss > 0.4 + 1e-9) g.nos.push({ no: it.no, loss: loss }); if (sk) g.subs[sk] = (g.subs[sk] || 0) + loss; }
   });
   var list = Object.keys(groups).map(function (k) { return groups[k]; }).filter(function (g) { return g.n >= 3 && g.loss > 1e-9; })
     .sort(function (a, b) { return b.loss - a.loss || b.n - a.n; });
@@ -1793,7 +1793,7 @@ function homeStudy(sets, entries) {
   if (avg !== undefined && avg !== null) cmp = '우리 학교 평균 ' + p100(1 - avg / g.n) + '점';
   return html + '<div class="study"><p class="st-main"><b>' + h(label) + '</b> ' + g.n + '문제 · <b>' + p100(1 - g.loss / g.n) + '점</b></p>' +
     (top && top !== label && g.subs[top] >= g.loss * 0.4 && g.subN[top] ? '<p class="st-sub">그중 ' + h(top) + ' ' + g.subN[top] + '문제 · ' + p100(1 - g.subs[top] / g.subN[top]) + '점</p>' : '') +
-    '<p class="st-redo">다시 풀 문제: <b>' + g.nos.join(', ') + '번</b></p>' + (cmp ? '<p class="st-cmp">' + cmp + '</p>' : '') +
+    (g.nos.length ? '<p class="st-redo">다시 풀 문제: <b>' + g.nos.sort(function (a, b) { return b.loss - a.loss || a.no - b.no; }).slice(0, 5).map(function (o) { return o.no; }).join(', ') + '번</b>' + (g.nos.length > 5 ? ' <small class="muted">(많이 틀린 순 5개)</small>' : '') + '</p>' : '<p class="st-redo muted">크게 틀린 문제는 없어요. 조금씩 놓친 선지는 정답 다시 보기에서 확인해요.</p>') + (cmp ? '<p class="st-cmp">' + cmp + '</p>' : '') +
     '<button type="button" class="link" data-act="focus-set" data-id="' + h(L.id) + '">이 주 정답 다시 보기 ›</button></div></section>';
 }
 function homeStatsHtml(me, sets, rk, cls, entries, st, upTop) {
