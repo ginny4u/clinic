@@ -419,6 +419,9 @@ details { border-top: 1px solid var(--line); padding-top: 10px; display: flex; f
 .term-t .tn { width: 7.5em; }
 .term-t .tl { width: 4.5em; }
 .term-t thead th { border-bottom: 1px solid var(--line-strong); }
+.term-scroll { max-height: calc(100vh - 16px); max-height: calc(100dvh - 16px); overflow: auto; overscroll-behavior: contain; }
+.term-t thead { position: sticky; top: 0; z-index: 3; }
+.term-t thead th { background: var(--sheet); }
 .term-t .tn { position: sticky; left: 0; z-index: 1; background: var(--sheet); text-align: left; min-width: 5.5em; border-right: 1px solid var(--line); white-space: nowrap; }
 .term-t td.tn { vertical-align: middle; border-bottom: 1px solid var(--line); }
 .term-t .tl { font-size: 12px; color: var(--muted); text-align: left; white-space: nowrap; padding-right: 8px; }
@@ -2349,7 +2352,7 @@ function tabTerm() {
         }).join('') + '</tr>';
     });
   });
-  html += '<div class="tscroll"><table class="t term-t" id="term-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
+  html += '<div class="tscroll term-scroll"><table class="t term-t" id="term-t"><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>' +
     '<p class="empty" id="term-none" hidden>찾는 학생이 없어요.</p>';
   setTimeout(termFilter, 0);
   return html;
@@ -3831,7 +3834,11 @@ function syncAdmin() {
     else if (A.tab === 'today') toast('다른 기기·학생에게서 새 결과가 들어왔어요. "오늘 결과" 탭을 다시 누르면 보여요.');
   });
 }
-function renderKeep() { var y = window.scrollY; render(); window.scrollTo(0, y); }
+function renderKeep() {
+  var y = window.scrollY, ts = document.querySelector('.term-scroll'), tp = ts ? [ts.scrollTop, ts.scrollLeft] : null;
+  render(); window.scrollTo(0, y);
+  var t2 = tp && document.querySelector('.term-scroll'); if (t2) { t2.scrollTop = tp[0]; t2.scrollLeft = tp[1]; }
+}
 
 function onChange(ev) {
   if (ev.target.id === 'chk-tach') { A.termAch = ev.target.checked; store_set('termAch', A.termAch ? '1' : '0'); return renderKeep(); }
