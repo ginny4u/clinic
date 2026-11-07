@@ -493,6 +493,7 @@ body.parent .busybar { background: #2557E0; }
 .pr-bar.abs span { font-weight: 500; margin-bottom: 8px; }
 .pr-wk { display: flex; margin-top: 6px; }
 .pr-wk span { flex: 1; min-width: 0; text-align: center; font-size: 12px; color: #5B6577; white-space: nowrap; }
+.pr-wk span.sp, .pr-fw small.sp { white-space: normal; word-break: keep-all; line-height: 1.3; text-align: center; }
 .pr-many .pr-bar span, .pr-many .pr-wk span { font-size: 11px; }
 .pr-many .pr-bar span { font-size: 10px; letter-spacing: -0.02em; }
 .pr-bars, .pr-wk { overflow: hidden; }
@@ -552,6 +553,10 @@ body.parent .busybar { background: #2557E0; }
 .pr-wchip.on { background: #111827; color: #fff; border-color: #111827; }
 .pr-wchip.on small { color: #c7d2fe; }
 .pr-wnote { margin: 6px 0 0; font-size: 12px; color: #b45309; }
+.pr-wrow { display: flex; align-items: center; gap: 8px; }
+.pr-wrow + .pr-wrow { margin-top: 6px; }
+.pr-wrow > b { flex: none; width: 5.6em; font-size: 12px; font-weight: 600; color: #374151; }
+.pr-wrow .pr-wchips { flex: 1; min-width: 0; }
 .pr-out { text-align: center; padding: 0 20px 40px; font-size: 13px; color: #5B6577; }
 .pr-link { background: none; border: none; padding: 6px 4px; color: #2557E0; font: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
 .pr-peek { background: #182033; color: #FFFFFF; font-size: 13px; line-height: 1.5; padding: 8px 16px; text-align: center; }
@@ -608,7 +613,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 22;
+var CORE_VERSION = 23;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -794,6 +799,17 @@ function parentsOf(store) { return store.parents ? store.parents() : []; }
 function fbsOf(store) { return store.fbs ? store.fbs() : []; }
 // '10.3주' → 103 (월·주 순서). 형식이 다르면 0
 function weekOrder(w) { var m = /(\d{1,2})\s*\.\s*(\d)/.exec(String(w || '')); return m ? Number(m[1]) * 10 + Number(m[2]) : 0; }
+// 만든 날(한국 시간)이 든 주(토요일 시작)의 순서. 2026-11-07(토) → 111, 2026-11-04(수) → 105(10/31 토요일 주)
+function dateWeekOrder(t) {
+  var ms = Date.parse(String(t || '')); if (isNaN(ms)) return 0;
+  var d = new Date(ms + 9 * 3600000);
+  d = new Date(d.getTime() - ((d.getUTCDay() + 1) % 7) * 86400000);   // 그 주 토요일
+  return (d.getUTCMonth() + 1) * 10 + Math.floor((d.getUTCDate() - 1) / 7) + 1;
+}
+// 세트 순서: 주차 칸('10.3주')으로, 그 꼴이 아니면(복습 테스트 등) 만든 날의 주로
+function setOrder(s) { return weekOrder(s && s.week) || dateWeekOrder(s && s.createdAt); }
+// 주차 칸이 '월.주' 꼴이 아닌 세트: 학부모 리포트에서 다른 주와 비교하지 않음
+function setSpecial(s) { return !weekOrder(s && s.week); }
 // 리포트의 '영역': 문항의 첫 유형(갈래 정보가 없어서)
 function prArea(it) { return (it && it.types && it.types[0]) || '기타'; }
 // 문항별 상태: o 맞음 · x 틀림 · u 안 푼 문항(미완료)
@@ -858,14 +874,14 @@ function parentReportFor(store, st, upto) {
   var mates = {}; all.forEach(function (s) { if (s.status === 'active' && s.school === st.school) mates[s.id] = 1; });
   mates[st.id] = 1;
   var from = PR_START && PR_START[st.school] ? weekOrder(PR_START[st.school]) : 0;
-  var sets = store.sets().filter(function (s) { return s.school === st.school && s.open === false && (im[s.id] || []).length && weekOrder(s.week) >= from; })
-    .sort(function (a, b) { return weekOrder(a.week) - weekOrder(b.week) || String(a.createdAt).localeCompare(String(b.createdAt)); });
+  var sets = store.sets().filter(function (s) { return s.school === st.school && s.open === false && (im[s.id] || []).length && setOrder(s) >= from; })
+    .sort(function (a, b) { return setOrder(a) - setOrder(b) || String(a.createdAt).localeCompare(String(b.createdAt)); });
   var weeks = [];
   sets.forEach(function (set) {
     var items = im[set.id], subsSet = subsAll.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; });
     var mine = subsSet.filter(function (sb) { return sb.studentId === st.id; })[0];
     if (!mine && String(st.joinedAt || '') > setCutoff(set, subsSet)) return;   // 학원에 오기 전 주
-    var w = { set: set, week: set.week, items: items, subsSet: subsSet, n: items.length };
+    var w = { set: set, week: set.week, items: items, subsSet: subsSet, n: items.length, sp: setSpecial(set) };
     if (mine) {
       w.cells = prCells(items, mine);
       w.blank = w.cells.filter(function (c) { return c.s === 'u'; }).length;
@@ -885,6 +901,9 @@ function parentReportFor(store, st, upto) {
   var cutW = upto ? weeks.map(function (x) { return x.set.id; }).indexOf(String(upto)) : -1;
   if (cutW >= 0) weeks = weeks.slice(0, cutW + 1);
   out.sel = weeks[weeks.length - 1].set.id; out.latest = weeks.length === out.weeksAll.length;
+  // 복습테스트(주차 칸이 '월.주'가 아닌 세트)는 클리닉 주차와 따로: 고른 리포트와 같은 종류끼리만 막대·비교·나아진 부분·오답 수 칸을 계산
+  var spSel = weeks[weeks.length - 1].sp;
+  weeks = weeks.filter(function (x) { return x.sp === spSel; });
   var i = weeks.length - 1, w = weeks[i];
   out.week = w.week; out.status = w.status; out.n = w.n;
   out.bars = weeks.map(function (x) {
@@ -940,7 +959,7 @@ function parentReportFor(store, st, upto) {
       var d = a0[a].x - a1[a].x;
       if (d > 0 && (!imp || d > imp.d || (d === imp.d && a0[a].x > imp.from))) imp = { area: a, from: a0[a].x, to: a1[a].x, d: d, fromN: a0[a].n, toN: a1[a].n };
     });
-    if (imp) out.improved = { area: imp.area, from: imp.from, to: imp.to, fromN: imp.fromN, toN: imp.toN };
+    if (imp) out.improved = { area: imp.area, from: imp.from, to: imp.to, fromN: imp.fromN, toN: imp.toN, w0: weeks[f].week };
   }
   return out;
 }
@@ -1620,7 +1639,7 @@ function weekDates(week, createdAt) {
 function weekWithDate(week, createdAt) { var d = weekDates(week, createdAt); return String(week || '') + (d ? ' (' + d.text + ')' : ''); }
 function p100(x) { return Math.round(Number(x) * 100); }   // 0~1 → 100점 만점 정수
 function ptxt(x) { var r = Math.round(Number(x) * 10) / 10; return r % 1 ? r.toFixed(1) : String(r); }
-function byWeekDesc(a, b) { return weekOrder(b.week) - weekOrder(a.week) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')); }
+function byWeekDesc(a, b) { return setOrder(b) - setOrder(a) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')); }
 function groupLabel(k) { k = String(k || ''); return k.indexOf('T:') === 0 ? (TYPES[k.slice(2)] || k.slice(2) || '기타') : k.replace(/^G:/, '') || '기타'; }
 var SCORE_NOTE = '등수는 이 점수로 매겨요. 정답을 다 못 찾아도 찾은 만큼 점수가 나오고, 틀린 선지를 고르면 깎여요.';
 function toast(msg, bad) {
@@ -2138,7 +2157,7 @@ function setPicker(set) {
   var d = A.data, by = {}, school = set ? set.school : A.wkSchool;
   d.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
   var schools = Object.keys(by).sort(function (a, b) { return a.localeCompare(b, 'ko'); });
-  var mine = (by[school] || []).slice().sort(function (a, b) { return weekOrder(b.week) - weekOrder(a.week) || String(b.createdAt).localeCompare(String(a.createdAt)); });
+  var mine = (by[school] || []).slice().sort(function (a, b) { return setOrder(b) - setOrder(a) || String(b.createdAt).localeCompare(String(a.createdAt)); });
   return '<div class="setpick"><div class="toolbar"><span class="spl">학교</span><div class="chips">' + schools.map(function (sc) {
       return '<button class="chip' + (sc === school ? ' on' : '') + '" data-act="wk-school" data-v="' + h(sc) + '">' + h(sc) + '</button>';
     }).join('') + '</div></div>' +
@@ -2553,7 +2572,7 @@ function stuTrendNote(weeks, types) {
 function stuTrendHtml(st, sm) {
   var d = A.data;
   var weeks = sm.ents.map(function (e) { return { set: d.setById[e.setId], c: calc([e]) }; }).filter(function (w) { return w.set; })
-    .sort(function (a, b) { return weekOrder(a.set.week) - weekOrder(b.set.week) || String(a.set.createdAt || '').localeCompare(String(b.set.createdAt || '')); });
+    .sort(function (a, b) { return setOrder(a.set) - setOrder(b.set) || String(a.set.createdAt || '').localeCompare(String(b.set.createdAt || '')); });
   var types = sortedRates(sm.calc.type, 3).slice(0, 8);
   var head = '<h3>유형별 정답률 <small class="muted">주차별 · 약한 유형부터</small></h3>';
   if (!types.length) return '<div>' + head + '<p class="empty">아직 푼 문제가 적어서(한 유형에 3문제 미만) 표로 보여 줄 게 없어요.</p></div>';
@@ -2964,7 +2983,7 @@ function resultRowsForDay(day, school) {
     return { extra: ck ? (ck.extra || '') : '', set: set, st: st, sub: sub, ck: ck, n: n, score: sub ? n - x : null, pct: sub && n ? subCredit(items, sub) / n : null, partial: setPartial(items), guess: gg, q: q, weak: sub ? weakTypesOf(items, sub.marks, blankNos(items, sub), creditMap(items, sub)) : [], blank: sub ? Object.keys(blankNos(items, sub)).length : 0 };
   }).filter(Boolean).sort(function (a, b) { return a.st.school.localeCompare(b.st.school, 'ko') || a.st.name.localeCompare(b.st.name, 'ko'); });
   // 같은 학생의 더 새 세트 줄이 있고, 이 줄은 오늘 낸 OMR 없이 숙제 검사만 오늘 바뀐 지난 세트면 뺌
-  var newer = function (a, b) { return weekOrder(a.week) - weekOrder(b.week) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')); };
+  var newer = function (a, b) { return setOrder(a) - setOrder(b) || String(a.createdAt || '').localeCompare(String(b.createdAt || '')); };
   var hidden = [];
   var kept = rows.filter(function (r) {
     if (r.sub && localDay(r.sub.submittedAt) === day) return true;
@@ -4144,16 +4163,16 @@ function prLoad() {
     PR.rep = r; PR.view = 'report'; prRender(); window.scrollTo(0, 0);
   });
 }
-function prBarsHtml(bars) {
+function prBarsHtml(bars, sp) {
   var n = bars.length, many = n > 6, gap = many ? 4 : n > 5 ? 6 : 12;
-  return '<p class="pr-cap">개강 후 점수 (100점 만점)</p><div class="' + (many ? 'pr-many' : '') + '"><div class="pr-bars" style="gap: ' + gap + 'px">' + bars.map(function (b, i) {
+  return '<p class="pr-cap">' + (sp ? '복습테스트 점수' : '개강 후 점수') + ' (100점 만점)</p><div class="' + (many ? 'pr-many' : '') + '"><div class="pr-bars" style="gap: ' + gap + 'px">' + bars.map(function (b, i) {
     var last = i === n - 1, hh = b.v ? Math.round(b.v * 1.05) : 0;
     var avl = b.a !== undefined && b.a !== null ? '<b class="pr-avgl" style="bottom: ' + Math.round(b.a * 1.05) + 'px" title="재원생 평균 ' + Math.round(b.a) + '점"></b>' : '';
     if (b.s === 'absent') return '<div class="pr-bar abs"><span>' + (b.c ? '미제출' : '결석') + '</span>' + avl + '</div>';
     if (b.s === 'partial') return '<div class="pr-bar part"><span>미완료</span><i style="height: ' + hh + 'px"></i>' + avl + '</div>';
     return '<div class="pr-bar' + (last ? ' last' : '') + '"><span>' + Math.round(b.v) + '점</span><i style="height: ' + hh + 'px"></i>' + avl + '</div>';
-  }).join('') + '</div><div class="pr-wk" style="gap: ' + gap + 'px">' + bars.map(function (b) { return '<span>' + h(many ? String(b.w).replace(/주$/, '') : b.w) + '</span>'; }).join('') + '</div></div>' +
-    (bars.some(function (b) { return b.a !== undefined && b.a !== null; }) ? '<p class="pr-leg2"><b class="pr-avgk"></b>그 주 재원생 평균</p>' : '');
+  }).join('') + '</div><div class="pr-wk" style="gap: ' + gap + 'px">' + bars.map(function (b) { return '<span' + (weekOrder(b.w) ? '' : ' class="sp"') + '>' + h(many ? String(b.w).replace(/주$/, '') : b.w) + '</span>'; }).join('') + '</div></div>' +
+    (bars.some(function (b) { return b.a !== undefined && b.a !== null; }) ? '<p class="pr-leg2"><b class="pr-avgk"></b>' + (sp ? '그 테스트 재원생 평균' : '그 주 재원생 평균') + '</p>' : '');
 }
 function prFocusHtml(r, f, absent) {
   var fn = f.works.reduce(function (t, w) { return t + w.cells.length; }, 0);
@@ -4167,9 +4186,9 @@ function prFocusHtml(r, f, absent) {
     '<p class="pr-small">' + (absent ? h(r.lastWeek) + '에 가장 많이 틀린 영역입니다.' : '이번 주 가장 많이 틀린 영역입니다.') + '</p>';
   if (r.bars.length > 1) {
     var many = false, grid = f.weeks.length > 6;   // 주가 많으면 5칸씩 두 줄로
-    html += '<p class="pr-cap s">개강 후 오답 수</p><div class="pr-fw' + (grid ? ' grid' : '') + '" style="gap: 6px">' + f.weeks.map(function (x) {
+    html += '<p class="pr-cap s">' + (weekOrder(r.week) ? '개강 후 오답 수' : '복습테스트별 오답 수') + '</p><div class="pr-fw' + (grid ? ' grid' : '') + '" style="gap: 6px">' + f.weeks.map(function (x) {
       var top = x.s === 'absent' ? '<em>' + (x.c ? '미제출' : '결석') + '</em>' : x.s === 'partial' ? '<em class="p">미완료</em>' : x.v === null ? '<em>–</em>' : '<b>' + x.v + '개</b>';
-      return '<div>' + top + '<small>' + h(many ? String(x.w).replace(/주$/, '') : x.w) + '</small></div>';
+      return '<div>' + top + '<small' + (weekOrder(x.w) ? '' : ' class="sp"') + '>' + h(many ? String(x.w).replace(/주$/, '') : x.w) + '</small></div>';
     }).join('') + '</div>';
   }
   html += '<div class="pr-leg"><span><i class="pr-c"></i>맞음</span><span><i class="pr-c x"></i>틀림<small class="pr-legs">(점수를 잃은 문제)</small></span>' + (anyU ? '<span><i class="pr-c u"></i>미완료</span>' : '') + '</div>';
@@ -4186,9 +4205,17 @@ function prFocusHtml(r, f, absent) {
 function prWeeksHtml(r) {
   var all = r.weeksAll || [];
   if (all.length < 2) return '';
-  return '<div class="pr-weeks"><span>주차별 리포트</span><div class="pr-wchips">' + all.slice().reverse().map(function (x, k) {
+  var chip = function (x, k) {
     return '<button type="button" class="pr-wchip' + (x.id === r.sel ? ' on' : '') + '" data-pr="week" data-id="' + h(x.id) + '"' + (x.id === r.sel ? ' aria-pressed="true"' : '') + '>' + h(x.w) + (k === 0 ? '<small>최신</small>' : '') + '</button>';
-  }).join('') + '</div>' + (r.latest ? '' : '<p class="pr-wnote">지난 리포트를 보고 있어요. ' + h(r.weeksAll[r.weeksAll.length - 1].w) + ' 최신 리포트는 맨 앞 버튼을 눌러 주세요.</p>') + '</div>';
+  };
+  var cl = all.filter(function (x) { return weekOrder(x.w); }), rv = all.filter(function (x) { return !weekOrder(x.w); });
+  if (cl.length && rv.length) {
+    var row = rv.some(function (x) { return x.id === r.sel; }) ? rv : cl, newest = row[row.length - 1];
+    var line = function (lab, list) { return '<div class="pr-wrow"><b>' + lab + '</b><div class="pr-wchips">' + list.slice().reverse().map(chip).join('') + '</div></div>'; };
+    return '<div class="pr-weeks"><span>주차별 리포트</span>' + line('클리닉', cl) + line('복습테스트', rv) +
+      (newest.id === r.sel ? '' : '<p class="pr-wnote">지난 리포트를 보고 있어요. ' + h(newest.w) + ' 최신 리포트는 같은 줄 맨 앞 버튼을 눌러 주세요.</p>') + '</div>';
+  }
+  return '<div class="pr-weeks"><span>주차별 리포트</span><div class="pr-wchips">' + all.slice().reverse().map(chip).join('') + '</div>' + (r.latest ? '' : '<p class="pr-wnote">지난 리포트를 보고 있어요. ' + h(r.weeksAll[r.weeksAll.length - 1].w) + ' 최신 리포트는 맨 앞 버튼을 눌러 주세요.</p>') + '</div>';
 }
 var TEACHER_INFO = { grade: '1학년', name: '배진희' };   // 학부모 리포트 머리·꼬리에 들어가는 학년·강사 이름
 function prReportHtml(r) {
@@ -4203,18 +4230,18 @@ function prReportHtml(r) {
       '<main class="pr-main"><section class="pr-sec"><h2>아직 리포트가 없어요</h2><p class="pr-p">첫 클리닉 주차가 최종 마감되면 이곳에 리포트가 만들어집니다.</p></section></main>' +
       '<footer class="pr-foot"><b>' + h(school) + ' ' + h(TEACHER_INFO.grade) + ' 담당 강사 ' + h(TEACHER_INFO.name) + ' <span>♥</span></b><small>리포트는 매주 클리닉 최종 마감 후 갱신됩니다.</small></footer></div>' + out + '</div>';
   }
-  var absent = r.status === 'absent', partial = r.status === 'partial', hasHist = r.bars.length > 1;
-  var html = bar + '<div class="pr">' + prWeeksHtml(r) + '<div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">내신 클리닉 주간 리포트</span></div>' +
+  var absent = r.status === 'absent', partial = r.status === 'partial', hasHist = r.bars.length > 1, sp = !weekOrder(r.week);
+  var html = bar + '<div class="pr">' + prWeeksHtml(r) + '<div class="pr-card" id="pr-card"><header class="pr-head"><div class="pr-top"><span class="pr-k">' + (sp ? '복습테스트 리포트' : '내신 클리닉 주간 리포트') + '</span></div>' +
     '<div class="pr-title"><h1 class="pr-h1">' + h(nameGen) + ' <span class="nw">' + h(r.week) + '</span>' + (weekDates(r.week, r.created) ? '<small class="pr-date">' + h(weekDates(r.week, r.created).text) + '</small>' : '') + '</h1>' + (r.badge ? '<span class="pr-badge">' + star + '<span>이번 주 ' + h(school) + ' 재원생 상위 ' + r.badge + '%</span></span>' : '') + '</div>' +
     '<p class="pr-sub">' + h(school) + ' ' + h(TEACHER_INFO.grade) + '</p></header><main class="pr-main">';
   // 이번 주 기록 / 정답률
   html += '<section class="pr-sec"><h2>' + (absent ? '이번 주 기록' : '이번 주 점수') + '</h2>';
   if (absent) {
-    html += r.came ? '<span class="pr-big gray">미제출</span><p class="pr-p">' + h(r.week) + ' 클리닉 확인 테스트를 제출하지 않아 기록이 없습니다.</p>'
-      : '<span class="pr-big gray">결석</span><p class="pr-p">개인 사정으로 등원하지 못해 ' + h(r.week) + ' 클리닉 기록이 없습니다.</p>' +
-        (r.absentN ? '<p class="pr-p">이번 주 ' + h(school) + ' 재원생 ' + (r.absentOf ? '<span style="white-space: nowrap">' + r.absentOf + '명 중</span> ' : '') + '클리닉에 결석한 학생은 <span style="white-space: nowrap">' + r.absentN + '명</span>입니다.</p>' : '');
+    html += r.came ? '<span class="pr-big gray">미제출</span><p class="pr-p">' + (sp ? h(prJosa(r.week, '을', '를')) + ' 제출하지 않아' : h(r.week) + ' 클리닉 확인 테스트를 제출하지 않아') + ' 기록이 없습니다.</p>'
+      : '<span class="pr-big gray">결석</span><p class="pr-p">개인 사정으로 등원하지 못해 ' + h(r.week) + (sp ? '' : ' 클리닉') + ' 기록이 없습니다.</p>' +
+        (r.absentN ? '<p class="pr-p">이번 주 ' + h(school) + ' 재원생 ' + (r.absentOf ? '<span style="white-space: nowrap">' + r.absentOf + '명 중</span> ' : '') + (sp ? h(r.week) + '에 결석한' : '클리닉에 결석한') + ' 학생은 <span style="white-space: nowrap">' + r.absentN + '명</span>입니다.</p>' : '');
   } else {
-    var d = r.delta, dl = d ? (d.last ? '지난주보다' : d.w + '보다') : '';
+    var d = r.delta, dl = d ? (d.last && !sp ? '지난주보다' : d.w + '보다') : '';
     html += '<div class="pr-row"><span class="pr-big">' + Math.round(r.score) + '점</span>' +
       (d && d.v > 0 ? '<span class="pr-up"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 10.5V1.5M2.5 5L6 1.5L9.5 5"></path></svg><span>' + h(dl) + ' +' + Math.round(d.v) + '점</span></span>' : '') +
       (d && d.v < 0 ? '<span class="pr-down">' + h(dl) + ' −' + Math.round(-d.v) + '점</span>' : '') + '</div>' +
@@ -4225,13 +4252,13 @@ function prReportHtml(r) {
       '<span>미완료: ' + h((r.undone || []).map(function (u) { return prWork(u.work) + ' ' + u.n + '문항'; }).join(', ')) + '</span>' +
       '<small>안 푼 문항은 틀린 것으로 계산했으며, 이번 주는 다른 주와 비교하지 않습니다.</small></div>';
   }
-  if (hasHist) html += prBarsHtml(r.bars);
-  else if (!absent) html += '<div class="pr-note">첫 주 리포트입니다. 다음 주부터 점수 변화와 나아진 부분이 함께 표시됩니다.</div>';
+  if (hasHist) html += prBarsHtml(r.bars, sp);
+  else if (!absent) html += '<div class="pr-note">' + (sp ? '첫 복습테스트 리포트입니다. 다음 복습테스트부터 점수 변화와 나아진 부분이 함께 표시됩니다.' : '첫 주 리포트입니다. 다음 주부터 점수 변화와 나아진 부분이 함께 표시됩니다.') + '</div>';
   html += '</section>';
   if (r.improved) {
     html += '<section class="pr-sec"><h2>나아진 부분</h2><div class="pr-imp"><b>' + h(prType(r.improved.area)) + ' 오답</b><span class="pr-to"><span class="pr-numw"><span class="pr-num">' + r.improved.from + '개</span>' + (r.improved.fromN ? '<small>' + r.improved.fromN + '문제 중 점수 잃음</small>' : '') + '</span>' +
       '<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="' + PR_ACC + '" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h15M13 6l6 6-6 6"></path></svg>' +
-      '<span class="pr-numw"><span class="pr-num to">' + r.improved.to + '개</span>' + (r.improved.toN ? '<small>' + r.improved.toN + '문제 중 점수 잃음</small>' : '') + '</span></span></div><p class="pr-small" style="margin-top: 10px">개강 첫 주와 이번 주의 오답 수를 비교했습니다.</p></section>';
+      '<span class="pr-numw"><span class="pr-num to">' + r.improved.to + '개</span>' + (r.improved.toN ? '<small>' + r.improved.toN + '문제 중 점수 잃음</small>' : '') + '</span></span></div><p class="pr-small" style="margin-top: 10px">' + (sp ? h(prJosa(r.improved.w0 || '첫 복습테스트', '과', '와')) + ' 이번 복습테스트의 오답 수를 비교했습니다.' : '개강 첫 주와 이번 주의 오답 수를 비교했습니다.') + '</p></section>';
   }
   if (absent && r.lastWeek && (r.focus || (r.misses && r.misses.length))) html += '<div class="pr-div"><span>마지막으로 참여한 ' + h(r.lastWeek) + ' 기록</span></div>';
   if (r.focus) html += prFocusHtml(r, r.focus, absent);
