@@ -613,7 +613,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 23;
+var CORE_VERSION = 24;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -761,6 +761,8 @@ function setStartCore(setId, subs, checks) {
   return t;
 }
 var RANK_MIN = 5;
+// 그 주 클리닉 대상에서 뺀 학생(따로 진행): 세트의 skip 칸에 학생 번호를 쉼표로. 안 낸 학생 처리(미제출·꼴찌·결석 인원)에서만 뺀다
+function skipOf(set) { var o = {}; String((set && set.skip) || '').split(',').forEach(function (x) { x = x.trim(); if (x) o[x] = 1; }); return o; }
 function setStats(store, set, items, meId, fresh, subsList) {
   var mates = {};
   store.students().forEach(function (s) { if (s.status === 'active' && s.school === set.school) mates[s.id] = 1; });
@@ -786,7 +788,8 @@ function setStats(store, set, items, meId, fresh, subsList) {
   // 아직 안 낸 재원생(세트가 만들어지기 전에 들어온 학생)은 꼴찌로 함께 센다
   var doneIds = {}; subs.forEach(function (s) { doneIds[s.studentId] = 1; });
   var cut = setCutoff(set, subs);
-  var absent = store.students().filter(function (s) { return mates[s.id] && !doneIds[s.id] && String(s.joinedAt) <= cut; }).length;
+  var skipS = skipOf(set);
+  var absent = store.students().filter(function (s) { return mates[s.id] && !doneIds[s.id] && !skipS[s.id] && String(s.joinedAt) <= cut; }).length;
   return { count: subs.length, of: set.open ? subs.length : subs.length + absent, live: !!set.open, rank: mine ? 1 + scores.filter(function (o) { return o.v > mine.v + 1e-9; }).length : null, items: per,
     few: !!set.open && subs.length < Math.min(RANK_MIN, subs.length + absent) };
 }
@@ -881,6 +884,7 @@ function parentReportFor(store, st, upto) {
     var items = im[set.id], subsSet = subsAll.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; });
     var mine = subsSet.filter(function (sb) { return sb.studentId === st.id; })[0];
     if (!mine && String(st.joinedAt || '') > setCutoff(set, subsSet)) return;   // 학원에 오기 전 주
+    if (!mine && skipOf(set)[st.id]) return;   // 그 주 대상 아님(따로 진행)
     var w = { set: set, week: set.week, items: items, subsSet: subsSet, n: items.length, sp: setSpecial(set) };
     if (mine) {
       w.cells = prCells(items, mine);
@@ -916,7 +920,8 @@ function parentReportFor(store, st, upto) {
     if (!w.came) {
       var cutA = setCutoff(w.set, w.subsSet), subA = {};
       w.subsSet.forEach(function (sb) { subA[sb.studentId] = 1; });
-      var inWeek = all.filter(function (s) { return s.school === st.school && (s.status === 'active' || s.id === st.id) && (subA[s.id] || String(s.joinedAt || '') <= cutA); });
+      var skA = skipOf(w.set);
+      var inWeek = all.filter(function (s) { return s.school === st.school && (s.status === 'active' || s.id === st.id) && (subA[s.id] || (!skA[s.id] && String(s.joinedAt || '') <= cutA)); });
       out.absentOf = inWeek.length;   // 그 주 재원생(그 주에 다닌 학생) 수
       out.absentN = inWeek.filter(function (s) {
         if (subA[s.id]) return false;
@@ -946,7 +951,8 @@ function parentReportFor(store, st, upto) {
   var list = w.subsSet.map(function (sb) { return { id: sb.studentId, v: subCredit(w.items, sb) }; }), done = {};
   list.forEach(function (o) { done[o.id] = 1; });
   var cut = setCutoff(w.set, w.subsSet);
-  all.forEach(function (s) { if (s.status === 'active' && s.school === st.school && !done[s.id] && String(s.joinedAt || '') <= cut) list.push({ id: s.id, v: -1 }); });
+  var skB = skipOf(w.set);
+  all.forEach(function (s) { if (s.status === 'active' && s.school === st.school && !done[s.id] && !skB[s.id] && String(s.joinedAt || '') <= cut) list.push({ id: s.id, v: -1 }); });
   var me = list.filter(function (o) { return o.id === st.id; })[0];
   var rank = 1 + list.filter(function (o) { return o.v > me.v + 1e-9; }).length, top = Math.ceil(rank * 10 / list.length - 1e-9) * 10;
   if (top <= 30) out.badge = top;
@@ -1022,7 +1028,9 @@ var CORE_ACTIONS = {
     var allSubs0 = store.subs(), allChecks0 = store.checks ? store.checks() : [], myCk = {};
     allChecks0.forEach(function (c) { if (c.studentId === st.id && (Object.keys(c.grades || {}).length || c.extra)) myCk[c.setId] = 1; });
     var outSets = sets.filter(function (s) {
-      if (bySet[s.id] || myCk[s.id]) return true;
+      if (bySet[s.id]) return true;
+      if (skipOf(s)[st.id]) return false;   // 그 주 대상 아님(따로 진행)
+      if (myCk[s.id]) return true;
       var t0 = setStartCore(s.id, allSubs0, allChecks0);
       return !(t0 && String(st.joinedAt || '') > t0);
     }).map(function (s) {
@@ -1072,7 +1080,8 @@ var CORE_ACTIONS = {
       var list = subsHere.slice(), done = {};
       list.forEach(function (o) { done[o.id] = 1; });
       var cut = setCutoff(set, allSubs.filter(function (sb) { return sb.setId === set.id && mates[sb.studentId]; }));
-      Object.keys(mates).forEach(function (id) { if (!done[id] && String(stuById[id].joinedAt) <= cut) list.push({ id: id, v: -1 }); });
+      var skH = skipOf(set);
+      Object.keys(mates).forEach(function (id) { if (!done[id] && !skH[id] && String(stuById[id].joinedAt) <= cut) list.push({ id: id, v: -1 }); });
       // 진행 중인 주는 min(5명, 그 학교 인원)이 낼 때까지 등수·누적에 넣지 않음
       if (openSet[set.id] && subsHere.length < Math.min(RANK_MIN, list.length)) { setRanks[set.id] = { few: true, count: subsHere.length }; return; }
       // 진행 중인 주는 낸 학생끼리 등수(live). 마감하면 안 낸 학생을 꼴찌로 넣어 다시 매김
@@ -1105,7 +1114,8 @@ var CORE_ACTIONS = {
       result = { score: items.length - wrong0, total: items.length, pct: items.length ? subCredit(items, sub) / items.length : 0, partial: setPartial(items), stats: setStats(store, set, items, st.id) };
       if (setIsOmr(items)) result.detail = resultFor(items, sub);
     }
-    return { ok: true, set: set, items: forStudent(items), sub: sub, result: result, check: check ? { grades: check.grades, checkedAt: check.checkedAt } : null };
+    var setOut = {}; Object.keys(set).forEach(function (k) { if (k !== 'skip') setOut[k] = set[k]; });
+    return { ok: true, set: setOut, items: forStudent(items), sub: sub, result: result, check: check ? { grades: check.grades, checkedAt: check.checkedAt } : null };
   },
 
   submit: function (req, store, env) {
@@ -1246,7 +1256,7 @@ var CORE_ACTIONS = {
     var set = { id: old ? old.id : 'C' + env.uuid().replace(/-/g, '').slice(0, 10), school: String(s.school).trim(),
       week: String(s.week).trim(), title: String(s.title || (s.school + ' ' + s.week)).trim(),
       homework: (Array.isArray(s.homework) ? s.homework : []).map(function (h) { return String(h).trim(); }).filter(Boolean),
-      open: s.open === undefined ? true : !!s.open, createdAt: old ? old.createdAt : env.now(), note: old ? (old.note || '') : '', evalName: old ? (old.evalName || '') : '' };
+      open: s.open === undefined ? true : !!s.open, createdAt: old ? old.createdAt : env.now(), note: old ? (old.note || '') : '', evalName: old ? (old.evalName || '') : '', skip: old ? (old.skip || '') : '' };
     store.putSet(set);
     store.putItems(set.id, items);
     var regraded = 0, oldSubs = 0;
@@ -1316,6 +1326,18 @@ var CORE_ACTIONS = {
       store.putCheck(c); saved.push(c);
     });
     return { ok: true, saved: saved };
+  },
+
+  saveSkip: function (req, store, env) {
+    requireAdmin(req, store, env);
+    var set = store.sets().filter(function (x) { return x.id === req.setId; })[0];
+    if (!set) return fail('세트를 찾을 수 없어요.');
+    if (!store.students().some(function (s) { return s.id === req.studentId; })) return fail('학생을 찾을 수 없어요.');
+    var m = skipOf(set);
+    if (req.on) m[req.studentId] = 1; else delete m[req.studentId];
+    set.skip = Object.keys(m).sort().join(',');
+    store.putSet(set);
+    return { ok: true, setId: set.id, skip: set.skip };
   },
 
   saveNote: function (req, store, env) {
@@ -2142,8 +2164,15 @@ function cameCount(setId) { return (A.data.checks || []).filter(function (c) { r
 function gradeOnly(x) { return ['A+', 'A', 'B', 'C', 'F'].indexOf(x) >= 0 ? x : ''; }
 function noItems(set) { return !(A.data.items[set.id] || []).length; }
 function expectedFor(set) {
-  var cut = setCutoff(set, A.data.subs.filter(function (sb) { return sb.setId === set.id; }));
-  return A.data.students.filter(function (s) { return s.status === 'active' && s.school === set.school && String(s.joinedAt) <= cut; });
+  var subs0 = A.data.subs.filter(function (sb) { return sb.setId === set.id; }), cut = setCutoff(set, subs0), sk = skipOf(set), did = {};
+  subs0.forEach(function (sb) { did[sb.studentId] = 1; });
+  return A.data.students.filter(function (s) { return s.status === 'active' && s.school === set.school && String(s.joinedAt) <= cut && (!sk[s.id] || did[s.id]); });
+}
+// 그 주 대상에서 뺀 학생 중 안 낸 학생(선생님 화면 '대상아님/개별진도' 줄)
+function skippedFor(set) {
+  var sk = skipOf(set), did = {};
+  A.data.subs.forEach(function (sb) { if (sb.setId === set.id) did[sb.studentId] = 1; });
+  return A.data.students.filter(function (s) { return sk[s.id] && !did[s.id] && s.school === set.school; });
 }
 function setOptions(sel) {
   var by = {}; A.data.sets.forEach(function (s) { (by[s.school] || (by[s.school] = [])).push(s); });
@@ -2195,6 +2224,8 @@ function tabWeek() {
       : '<div><span>평균 찍맞</span><strong class="num">' + gAvg.toFixed(1) + '</strong></div>') +
     '</div>';
   if (missing.length) html += '<section class="block"><h2>미제출 <small>' + missing.length + '명</small></h2><div class="chips">' + missing.map(function (s) { return '<button class="chip todo" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button>'; }).join('') + '</div></section>';
+  var skipped = skippedFor(set);
+  if (skipped.length) html += '<section class="block"><h2>대상아님/개별진도 <small>' + skipped.length + '명</small></h2><p class="note">이 주 클리닉을 개별 진도로 진행해 대상에서 뺀 학생이에요. 미제출, 꼴찌, 결석 인원에 넣지 않아요. 이름을 누르면 학생 상세에서 되돌릴 수 있어요.</p><div class="chips">' + skipped.map(function (s) { return '<button class="chip" data-act="detail" data-id="' + s.id + '">' + h(s.name) + '</button>'; }).join('') + '</div></section>';
 
   // 문항별
   var per = items.map(function (it) {
@@ -2598,7 +2629,8 @@ function stuWeekRank(set, sid) {
   var d = A.data, items = d.items[set.id] || [], n = items.length; if (!n) return null;
   var subs = d.subs.filter(function (x) { return x.setId === set.id; }), cut = setCutoff(set, subs), by = {};
   subs.forEach(function (x) { by[x.studentId] = subCredit(items, x) / n; });
-  var list = d.students.filter(function (s) { return s.school === set.school && (s.status === 'active' || by[s.id] !== undefined) && (by[s.id] !== undefined || String(s.joinedAt || '') <= cut); })
+  var sk = skipOf(set);
+  var list = d.students.filter(function (s) { return s.school === set.school && (s.status === 'active' || by[s.id] !== undefined) && (by[s.id] !== undefined || (!sk[s.id] && String(s.joinedAt || '') <= cut)); })
     .map(function (s) { return { id: s.id, v: by[s.id] !== undefined ? by[s.id] : -1 }; });
   if (set.open) list = list.filter(function (o) { return o.v >= 0; });   // 진행 중인 주는 낸 학생끼리
   var me = list.filter(function (o) { return o.id === sid; })[0]; if (!me || me.v < 0) return null;
@@ -2654,6 +2686,10 @@ function stuMissList(st, sets) {
     }).join('') + '</tbody></table></div></div>';
   return html;
 }
+function skipBtn(set, sid, on) {
+  return '<button class="mini" data-act="skip-set" data-on="' + (on ? 1 : 0) + '" data-set="' + h(set.id) + '" data-st="' + h(sid) + '" title="' +
+    (on ? '이 주 클리닉을 개별 진도로 진행한 학생: 미제출, 꼴찌, 결석 인원에서 빼요. 학생 홈과 학부모 리포트에서도 이 주가 안 보여요.' : '다시 이 주 대상으로 넣어요(안 냈으면 미제출로).') + '">' + (on ? '대상에서 빼기' : '되돌리기') + '</button>';
+}
 function studentModal(id) {
   var d = A.data, st = d.stuById[id]; if (!st) return '';
   var sets = d.sets.filter(function (s) { return s.school === st.school; }).slice().sort(byWeekDesc), any = false;
@@ -2662,7 +2698,8 @@ function studentModal(id) {
     var items = d.items[set.id] || [], n = items.length, wl = '<td class="nw">' + h(weekWithDate(set.week, set.createdAt)) + '</td>';
     if (!n) { var ck0 = (d.checks || []).filter(function (c) { return c.setId === set.id && c.studentId === id; })[0]; return '<tr>' + wl + '<td colspan="5" class="muted">입력 없는 주' + (ckCame(ck0) ? ' · 왔음' : '') + '</td></tr>'; }
     if (!sub && String(st.joinedAt) > setCutoff(set, d.subs.filter(function (x) { return x.setId === set.id; }))) return '<tr>' + wl + '<td colspan="5" class="muted">합류 전</td></tr>';
-    if (!sub) return '<tr>' + wl + '<td colspan="5" class="badtxt">미제출</td></tr>';
+    if (!sub) return skipOf(set)[id] ? '<tr>' + wl + '<td colspan="4" class="muted">대상아님/개별진도</td><td class="acts">' + skipBtn(set, id, false) + '</td></tr>'
+      : '<tr>' + wl + '<td colspan="4" class="badtxt">미제출</td><td class="acts">' + skipBtn(set, id, true) + '</td></tr>';
     any = true;
     var x = 0; Object.keys(sub.marks).forEach(function (k) { if (sub.marks[k] === 'X') x++; });
     var nb = Object.keys(blankNos(items, sub)).length, cr = subCredit(items, sub), rk = stuWeekRank(set, id);
@@ -2894,7 +2931,7 @@ function ckRowHtml(st, set) {
   var r = { st: st, set: set };
     var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
     var isAtt = !!(A.attIds && A.attIds[st.id]);
-    return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
+    return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + (skipOf(set)[st.id] ? ' <span class="tag">대상아님/개별진도</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
       '<small class="' + (sv === 'err' || sv === 'wait' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'wait' ? '다시 로그인하면 저장돼요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
       '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F', 'N'].map(function (v) {
@@ -3420,7 +3457,7 @@ function smsText(r) {
     if (r.set.homework.some(function (hw) { var g = r.ck && r.ck.grades[hw]; return g === 'B' || g === 'F'; })) hwLines.push('* 미흡한 과제는 학원에서 완료했습니다.');
     secs.push(hwLines);
   }
-  if (r.n && (!absent || r.sub)) secs.push(['■ 확인 테스트 성취도', r.sub ? (r.partial ? '- 총 ' + r.n + '문항, ' + p100(r.pct) + '점 (100점 만점), 완벽히 맞힌 문항 ' + r.score + '개' + (r.blank ? ', ' + r.blank + '문항 미완료' : '') : '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' + (r.blank ? ' (' + r.blank + '문항 미완료)' : '')) : '- 미제출']);
+  if (r.n && (!absent || r.sub) && (r.sub || !skipOf(r.set)[r.st.id])) secs.push(['■ 확인 테스트 성취도', r.sub ? (r.partial ? '- 총 ' + r.n + '문항, ' + p100(r.pct) + '점 (100점 만점), 완벽히 맞힌 문항 ' + r.score + '개' + (r.blank ? ', ' + r.blank + '문항 미완료' : '') : '- 총 ' + r.n + '문항 중 ' + r.score + '문항 정답' + (r.blank ? ' (' + r.blank + '문항 미완료)' : '')) : '- 미제출']);
   var ex = gradeOnly(r.extra);
   if (ex && r.set.evalName) secs.push(['■ ' + r.set.evalName + ' 성취도', '- ' + ex + ' ( A+ / A / B / C / F)']);
   // 학생별 피드백을 넣는 중이어도 입력 없는 세트는 피드백이 없으니 진행 사항 문장을 넣음
@@ -3468,7 +3505,7 @@ function tabToday() {
     rows.map(function (r) {
       return '<tr><td><button class="link" data-act="detail" data-id="' + r.st.id + '">' + h(r.st.name) + '</button></td><td class="muted">' + h(r.st.school + ' · ' + r.set.week) + '</td>' +
         '<td class="num">' + (!r.set.homework.length ? '<span class="muted">없음</span>' : r.ck ? r.set.homework.map(function (hw) { var v = r.ck.grades[hw] || '-'; return '<span class="gmini g-' + v + '" title="' + h(hw) + (v === 'N' ? ' 미지참' : '') + '">' + (v === 'N' ? '미' : MARK[v] || '-') + '</span>'; }).join('') : '<span class="muted">미검사</span>') + '</td>' +
-        '<td class="r num">' + (!r.n ? '<span class="muted">입력 없음</span>' : r.sub ? (r.partial ? pct(r.pct) + ' <small class="muted">완벽 ' + r.score + '/' + r.n + '</small>' : r.score + '/' + r.n) + (r.blank ? ' <small class="muted">안 푼 ' + r.blank + '</small>' : '') : '<span class="badtxt">미제출</span>') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + (r.sub ? r.guess : '') + '</td>' : '') +
+        '<td class="r num">' + (!r.n ? '<span class="muted">입력 없음</span>' : r.sub ? (r.partial ? pct(r.pct) + ' <small class="muted">완벽 ' + r.score + '/' + r.n + '</small>' : r.score + '/' + r.n) + (r.blank ? ' <small class="muted">안 푼 ' + r.blank + '</small>' : '') : skipOf(r.set)[r.st.id] ? '<span class="muted">대상아님/개별진도</span>' : '<span class="badtxt">미제출</span>') + '</td>' + (hasGuess(d.subs) ? '<td class="r num">' + (r.sub ? r.guess : '') + '</td>' : '') +
         '<td>' + h(gradeOnly(r.extra)) + '</td><td class="muted">' + h(r.weak.join(', ')) + '</td>' +
         '<td class="acts"><button class="mini" data-act="today-hide" data-k="' + h(r.set.id + '|' + r.st.id) + '" title="오늘 목록·문자·학원관리시스템용 복사에서 빼요. 제출 기록은 그대로예요.">빼기</button></td></tr>';
     }).join('') + '</tbody></table></div>';
@@ -3727,6 +3764,21 @@ function onClick(ev) {
       var fk = t.dataset.set + '.' + t.dataset.st; delete A.fbEdit[fk]; store_set('fb.' + fk, null); delete FB.srv[fk];
       toast((rst ? rst.name + ' ' : '') + (rset ? rset.week + ' ' : '') + '답을 지웠어요. 학생이 새로고침하면 다시 낼 수 있어요.');
       applyAdmin(r.all);
+    });
+    return;
+  }
+  if (act === 'skip-set') {
+    var kset = A.data.setById[t.dataset.set], kst = A.data.stuById[t.dataset.st], kon = t.dataset.on === '1';
+    if (!kset || !kst || t.disabled) return;
+    t.disabled = true;
+    api('saveSkip', { token: S.token, setId: kset.id, studentId: kst.id, on: kon }).then(function (r) {
+      t.disabled = false;
+      if (isAuthErr(r)) return needRelogin();
+      if (!r.ok) return toast(/알 수 없는 요청/.test(r.error || '') ? '저장하지 못했어요. 서버(앱스 스크립트) 업데이트가 필요해요. 새 omr 파일을 올리고 새 버전으로 배포해 주세요.' : (r.error || '저장하지 못했어요.'), true);
+      kset.skip = r.skip;
+      A.data.sets.forEach(function (x) { if (x.id === kset.id) x.skip = r.skip; });
+      toast(prJosa(kst.name, '을', '를') + ' ' + kset.school + ' ' + kset.week + (kon ? ' 대상에서 뺐어요.' : ' 대상으로 되돌렸어요.'));
+      renderKeep();
     });
     return;
   }
