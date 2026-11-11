@@ -613,7 +613,7 @@ var CLINIC_API_URL = 'https://script.google.com/macros/s/AKfycbxN_zUg62UVzI-xkiB
 </script>
 <script>
 /* ===== 클리닉 점검표 공통 로직 (Apps Script와 미리보기에서 똑같이 사용) ===== */
-var CORE_VERSION = 24;
+var CORE_VERSION = 26;
 
 function normName(s) { return String(s || '').replace(/\s+/g, '').trim(); }
 
@@ -651,9 +651,15 @@ function publicStudent(s) {
 }
 
 function requireStudent(req, store, env) {
-  var id = req.token && env.cacheGet('t:' + req.token);
+  var id = req.token && env.cacheGet('t:' + req.token), all = null;
+  if (id) req.longExp = 0;
+  else if (req.token && typeof longTokenCheck === 'function') {
+    all = store.students();
+    var lt = longTokenCheck(env, 's', req.token, function (sid) { var s0 = all.filter(function (s) { return s.id === sid; })[0]; return s0 && s0.pwHash; });
+    if (lt) { id = lt.id; req.longExp = lt.exp; }
+  }
   if (!id) throw userErr('로그인 시간이 지났습니다. 다시 로그인해 주세요.');
-  var st = store.students().filter(function (s) { return s.id === id; })[0];
+  var st = (all || store.students()).filter(function (s) { return s.id === id; })[0];
   if (!st || st.status !== 'active') throw userErr('등록된 학생이 아닙니다. 선생님께 말씀 드리세요.');
   return st;
 }
@@ -688,6 +694,31 @@ function cleanMarks(obj, n, allowed) {
 }
 
 /* ---------- 무한선지(OMR) ---------- */
+/* 오래 가는 로그인(학생 s, 학부모 p): 'L1.종류.번호.만료(36진수 ms).서명'. 서명 = 비밀값 + 번호 + 만료 + 비밀번호 해시의 해시 */
+var LONG_LOGIN_DAYS = 30;
+function loginSecret(env) { try { return env && typeof env.secret === 'function' ? String(env.secret() || '') : ''; } catch (e) { return ''; } }
+function loginSig(env, sec, kind, id, exp, pwh) { return env.hash('L1|' + sec + '|' + kind + '|' + id + '|' + exp + '|' + pwh + '|' + sec); }
+function longToken(env, kind, id, pwh) {
+  var sec = loginSecret(env);
+  if (!sec || !pwh || /\./.test(String(id))) return null;
+  var exp = (Date.parse(env.now()) + LONG_LOGIN_DAYS * 86400000).toString(36);
+  return 'L1.' + kind + '.' + id + '.' + exp + '.' + loginSig(env, sec, kind, id, exp, pwh);
+}
+// 맞는 열쇠면 { id, exp(ms) }, 아니면 null. pwhOf(번호) = 지금 비밀번호 해시
+function longTokenCheck(env, kind, token, pwhOf) {
+  var p = String(token || '').split('.');
+  if (p.length < 5 || p[0] !== 'L1' || p[1] !== kind) return null;
+  var sec = loginSecret(env); if (!sec) return null;
+  var id = p[2], exp = p[3], sig = p.slice(4).join('.'), ms = parseInt(exp, 36);
+  if (!(ms > Date.parse(env.now()))) return null;
+  var pwh = pwhOf(id); if (!pwh) return null;
+  return loginSig(env, sec, kind, id, exp, pwh) === sig ? { id: id, exp: ms } : null;
+}
+// 하루 이상 지난 열쇠면 새 열쇠(만료 30일 다시 시작)
+function longRenew(env, kind, id, pwh, exp) {
+  if (exp && exp - Date.parse(env.now()) > (LONG_LOGIN_DAYS - 1) * 86400000) return null;
+  return longToken(env, kind, id, pwh);
+}
 // 문항에 opts(선지 수)와 ans(정답 번호 목록)가 있으면 학생은 고른 번호를 누르고 서버가 채점한다.
 // 학생이 고른 번호는 시트 칸을 늘리지 않도록 follow에 'p번호' 키로 저장한다. 예: follow.p3 = '2,4,7'
 function cleanPicks(v, max) {
@@ -1000,8 +1031,8 @@ var CORE_ACTIONS = {
       return fail('비밀번호가 틀렸습니다. (' + (n + 1) + '/5)');
     }
     env.cacheRemove('fail:' + st.id);
-    var token = env.uuid();
-    env.cachePut('t:' + token, st.id, 21600);
+    var token = longToken(env, 's', st.id, st.pwHash);
+    if (!token) { token = env.uuid(); env.cachePut('t:' + token, st.id, 21600); }
     return { ok: true, token: token, me: publicStudent(st) };
   },
 
@@ -1014,7 +1045,8 @@ var CORE_ACTIONS = {
     st.pwHash = pwHash(env, st.id, pw);
     st.mustChange = false;
     store.putStudent(st);
-    return { ok: true, me: publicStudent(st) };
+    var nt = req.longExp !== undefined && req.longExp !== 0 ? longToken(env, 's', st.id, st.pwHash) : null;
+    return nt ? { ok: true, me: publicStudent(st), token: nt } : { ok: true, me: publicStudent(st) };
   },
 
   home: function (req, store, env) {
@@ -1097,8 +1129,10 @@ var CORE_ACTIONS = {
     var overallList = Object.keys(weekly).map(function (id) { return { id: id, v: weekly[id].sum / weekly[id].n }; });
     var classLoss = {}; Object.keys(groupLoss).forEach(function (sid) { var gl = groupLoss[sid]; if (gl.n < RANK_MIN) return; var o = classLoss[sid] = {}; Object.keys(gl.g).forEach(function (k) { o[k] = Math.round(gl.g[k] / gl.n * 100) / 100; }); });
     var classRates = {}; Object.keys(classType).forEach(function (k) { classRates[k] = classType[k].n ? classType[k].miss / classType[k].n : 0; });
-    return { ok: true, me: publicStudent(st), sets: outSets, history: history, items: items,
+    var out = { ok: true, me: publicStudent(st), sets: outSets, history: history, items: items,
       ranks: { sets: setRanks, overall: rankOf(overallList, st.id), mates: Object.keys(mates).length }, classRates: classRates, classLoss: classLoss };
+    if (req.longExp || (req.longExp === 0 && !env.cacheGet('p:' + req.token))) { var rn = longRenew(env, 's', st.id, st.pwHash, req.longExp); if (rn) out.renew = rn; }
+    return out;
   },
 
   getSet: function (req, store, env) {
@@ -1414,17 +1448,23 @@ var CORE_ACTIONS = {
     if (!rec) return fail('학부모 비밀번호가 아직 등록되지 않았어요. 선생님께 문의해 주세요.');
     if (parentHash(env, st.id, pw) !== rec.pwHash) { lockBump(env, key, n); return fail('비밀번호가 맞지 않습니다. (' + (n + 1) + '/5)'); }
     env.cacheRemove('fail:' + key);
-    var t = env.uuid(); env.cachePut('r:' + t, st.id, 21600);
+    var t = longToken(env, 'p', st.id, rec.pwHash);
+    if (!t) { t = env.uuid(); env.cachePut('r:' + t, st.id, 21600); }
     return { ok: true, token: t };
   },
 
   parentReport: function (req, store, env) {
-    var id = req.token && env.cacheGet('r:' + req.token);
+    var id = req.token && env.cacheGet('r:' + req.token), plt = null;
     if (!id && req.token && req.studentId && env.cacheGet('a:' + req.token)) id = String(req.studentId);   // 선생님 미리보기
+    if (!id && req.token) {
+      plt = longTokenCheck(env, 'p', req.token, function (sid) { var r0 = parentsOf(store).filter(function (p) { return p.studentId === sid; })[0]; return r0 && r0.pwHash; });
+      if (plt) id = plt.id;
+    }
     if (!id) return fail('로그인 시간이 지났습니다. 다시 로그인해 주세요.');
     var st = store.students().filter(function (s) { return s.id === id; })[0];
     if (!st || st.status !== 'active') return fail('등록된 학생이 아닙니다.');
     var rep = parentReportFor(store, st, req.setId ? String(req.setId) : null); rep.ok = true;
+    if (plt) { var prec = parentsOf(store).filter(function (p) { return p.studentId === st.id; })[0], rn = prec && longRenew(env, 'p', st.id, prec.pwHash, plt.exp); if (rn) rep.renew = rn; }
     return rep;
   },
 
@@ -1768,6 +1808,7 @@ var HOME = null;
 function loadHome() {
   return api('home', { token: S.token }).then(function (r) {
     if (!r.ok) { logout(r.error); return; }
+    if (r.renew && S.role === 'student' && !S.peek) { S.token = r.renew; store_set('token', r.renew); }
     HOME = r; S.me = r.me; setView('home');
   });
 }
@@ -4055,6 +4096,7 @@ function onSubmit(ev) {
     if (a !== b) { L.err = '두 번 입력한 비밀번호가 서로 다릅니다.'; return render(); }
     api('changePw', { token: S.token, newPw: a }).then(function (r) {
       if (!r.ok) { L.err = r.error; return render(); }
+      if (r.token) { S.token = r.token; store_set('token', r.token); }
       L.err = ''; toast('비밀번호를 변경했습니다.'); if (r.home) { HOME = r.home; S.me = r.home.me; setView('home'); } else loadHome();
     });
   }
@@ -4212,6 +4254,7 @@ function prLoad() {
       PR.view = PR.pick ? 'pw' : 'login'; PR.err = r.error || '잠시 뒤에 다시 시도해 주세요.';
       return prRender();
     }
+    if (r.renew && !PR.pv && !PR.peek) { PR.token = r.renew; store_set('ptoken', r.renew); }
     PR.rep = r; PR.view = 'report'; prRender(); window.scrollTo(0, 0);
   });
 }
