@@ -274,6 +274,9 @@ textarea { resize: vertical; }
 .wk-now { font-style: normal; font-weight: 400; font-size: 12px; color: #2557e0; }
 button.wk-row { width: 100%; text-align: left; font: inherit; color: inherit; background: none; border: 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .wk-go { color: var(--muted); text-align: right; }
+.ov-v b { font-weight: 600; }
+.ov-v small { font-size: 16px; }
+.ov-block .note { margin-top: 8px; }
 .study { border: 1px solid var(--line-strong); background: var(--sheet); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
 .study p { margin: 0; line-height: 1.55; word-break: keep-all; }
 .st-main { font-size: 16px; }
@@ -1887,6 +1890,13 @@ function homeStatsHtml(me, sets, rk, cls, entries, st, upTop) {
   if (entries.length) html += homeStudy(sets, entries);
   return html;
 }
+// 지금까지 합친 등수: 서버 ranks.overall(주마다 점수 평균, 마감할 때까지 안 낸 주는 0점)
+function homeOverallHtml(me, rk) {
+  var ov = rk && rk.overall; if (!ov || !ov.of) return '';
+  var v = rankShown(ov) ? '<b class="num">' + ov.rank + '등</b> <small>/ ' + ov.of + '명</small>' : '<small>' + rankCut(ov.of) + '등까지만 공개</small>';
+  return '<section class="block ov-block"><h2>지금까지 합친 등수</h2><div class="kpis"><div><span>' + h(me.school) + ' 재원생 중</span><strong class="ov-v">' + v + '</strong></div></div>' +
+    '<p class="note">지금까지 모든 주의 점수를 평균 내서 같은 학교 재원생끼리 매겨요. 마감할 때까지 안 낸 주는 0점, 꼴찌로 계산해요.</p></section>';
+}
 function viewHome() {
   var me = HOME.me, sets = HOME.sets, rk = HOME.ranks || {}, cls = HOME.classRates || {};
   var open = sets.filter(function (s) { return s.open; }), closed = sets.filter(function (s) { return !s.open; });
@@ -1899,7 +1909,7 @@ function viewHome() {
   if (!open.length) html += '<p class="empty">지금 제출할 수 있는 클리닉이 없습니다.</p>';
   var ru = rankUpInfo(), upIn = ru && open.some(function (s) { return s.id === ru.id && s.submitted; });
   html += '<div class="cards">' + open.map(function (s) { return homeCard(s, rk.sets && rk.sets[s.id], upIn && s.id === ru.id ? ru.html('span') : ''); }).join('') + '</div></section>';
-  html += homeStatsHtml(me, sets, rk, cls, entries, st, !!ru && !upIn);
+  html += homeOverallHtml(me, rk) + homeStatsHtml(me, sets, rk, cls, entries, st, !!ru && !upIn);
   return html + '</main>';
 }
 function trend(entries) {
