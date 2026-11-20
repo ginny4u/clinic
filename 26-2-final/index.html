@@ -2891,8 +2891,10 @@ function ckGroup(setId, sid) {
     if (!c || localDay(c.checkedAt) === todayStr()) return 2;
     return A.attIds && A.attIds[sid] ? 4 : 3;
   }
-  return A.attIds && A.attIds[sid] ? 0 : ckNewcomer(setId, sid) ? 7 : 1;
+  return (A.attIds && A.attIds[sid]) || ckSubmitted(setId, sid) ? 0 : ckNewcomer(setId, sid) ? 7 : 1;
 }
+// 그 세트에 확인 테스트(OMR)를 낸 적이 있는지
+function ckSubmitted(setId, sid) { return (A.data.subs || []).some(function (s) { return s.setId === setId && s.studentId === sid; }); }
 function ckDivHtml(grp) {
   var t = grp === 0 ? '출석했는데 아직 체크 안 한 학생' : grp === 1 ? (A.attN ? '출석 명단에 없는 학생 (체크 전)' : '아직 체크 안 한 학생') : grp === 2 ? '오늘 체크한 학생 · 출석' : grp === 4 ? '오늘 또 온 학생 (이번 주 체크는 끝남)' : grp === 5 ? '오늘 체크한 학생 · 결석' : grp === 6 ? '전에 결석 처리한 학생' : grp === 7 ? '이번 주 클리닉이 시작된 뒤 등록한 학생 (다음 세트부터)' : '전에 체크한 학생';
   return '<div class="ck-div" data-grp="' + grp + '"><span>' + t + '</span> <span class="ck-cnt"></span></div>';
@@ -2982,7 +2984,7 @@ function ckRowHtml(st, set) {
   var r = { st: st, set: set };
     var st = r.st, set = r.set, g = gradesFor(set.id), row = g[st.id] || {}, sv = A.saving[set.id + ':' + st.id];
     var isAtt = !!(A.attIds && A.attIds[st.id]);
-    return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : '') + (skipOf(set)[st.id] ? ' <span class="tag">대상아님/개별진도</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
+    return '<div class="ckrow' + (isAtt ? ' att' : '') + (ckGroup(set.id, st.id) >= 2 ? ' done' : '') + '" id="ck-' + set.id + '-' + st.id + '" data-set="' + set.id + '" data-st="' + st.id + '" data-name="' + h(st.name) + '"><div class="ck-name"><strong>' + h(st.name) + (isAtt ? '<span class="tag att">출석</span>' : ckGroup(set.id, st.id) === 0 ? '<span class="tag att">확인 테스트 냄</span>' : '') + (skipOf(set)[st.id] ? ' <span class="tag">대상아님/개별진도</span>' : '') + '</strong><small class="muted">' + h(st.school + ' · ' + set.week) + '</small>' +
       '<small class="' + (sv === 'err' || sv === 'wait' ? 'badtxt' : 'oktxt') + '">' + (sv === 'saving' ? '저장 중…' : sv === 'err' ? '저장 실패, 다시 눌러 주세요' : sv === 'wait' ? '다시 로그인하면 저장돼요' : sv === 'ok' ? '저장됨' : '') + '</small></div>' +
       '<div class="ck-items">' + (set.homework.length ? set.homework.map(function (hw) {
         return '<div class="ck-item"><span>' + h(hw) + '</span><div class="seg">' + ['A', 'B', 'F', 'N'].map(function (v) {
