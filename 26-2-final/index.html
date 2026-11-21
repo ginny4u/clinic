@@ -175,9 +175,7 @@ textarea { resize: vertical; }
 .orow-h small { color: var(--muted); font-size: 12px; word-break: keep-all; }
 .opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(42px, 1fr)); gap: 6px; }
 .op { height: 42px; border: 1px solid var(--line-strong); background: var(--sheet); color: var(--ink); border-radius: 999px; font-family: var(--f-num); font-size: 16px; cursor: pointer; letter-spacing: 0;}
-.op.on { background: var(--ink); color: var(--sheet); border-color: var(--ink); font-weight: 700; }
-.op.ess { border-radius: 4px; grid-column: span 2; font-family: var(--f-body); font-size: 14px; }
-.op.ess.x { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+.op.on { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
 .orow.todo .orow-h b { color: var(--accent); }
 .orow.blank { background: var(--warn-bg); box-shadow: -10px 0 0 var(--warn-bg), -14px 0 0 var(--warn), 10px 0 0 var(--warn-bg); }
 .orow.blank .orow-h b { color: var(--warn); }
@@ -2064,8 +2062,7 @@ function omrSheet() {
       }
       return grp + '<div class="orow' + (F.blankAsk && !p.length ? ' blank' : '') + '" id="orow-' + it.no + '">' + head + '<div class="opts">' + btns + '</div></div>';
     }
-    var x = F.marks[it.no] === 'X';
-    return grp + '<div class="orow" id="orow-' + it.no + '">' + head + '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="ess" data-no="' + it.no + '" aria-pressed="' + x + '">' + (x ? '틀림' : '맞음') + '</button></div></div>';
+    return grp + '<div class="orow" id="orow-' + it.no + '">' + head + '<div class="opts"></div></div>';
   }).join('');
   return '<section class="sheet"><h2>확인 테스트</h2>' + tipBox('omr', '<p class="note">세트마다 내가 고른 번호를 <b>모두</b> 누르세요. 다시 누르면 취소돼요. 제출하면 바로 채점되고, 제출한 뒤에는 고칠 수 없어요.</p>') +
     '<div class="obar"><span class="obar-n"><b class="num">' + done + ' / ' + need + '</b> 입력</span>' +
@@ -2187,10 +2184,7 @@ function subEditModal() {
       var p = e.picks[it.no] || [], ans = cleanPicks(it.ans, Number(it.opts)), btns = '';
       for (var k = 1; k <= it.opts; k++) btns += '<button type="button" class="op' + (p.indexOf(k) >= 0 ? ' on' : '') + '" data-act="se-opt" data-no="' + it.no + '" data-k="' + k + '" aria-label="' + it.no + '번 ' + k + '번 선지">' + k + '</button>';
       body = '<div class="opts">' + btns + '</div><small class="' + (wrong ? 'badtxt' : 'oktxt') + '">' + (wrong ? (part && itemCredit(it, fake) > 0 ? '△ 부분 ' + fmtX(itemCredit(it, fake)) + '점' : '✕ 틀림') : '○ 맞음') + ' · 정답 ' + ans.map(numc).join(' ') + (p.length ? '' : ' · 안 고름') + '</small>';
-    } else {
-      var x = e.marks[it.no] === 'X';
-      body = '<div class="opts"><button type="button" class="op ess' + (x ? ' x' : '') + '" data-act="se-ess" data-no="' + it.no + '">' + (x ? '틀림' : '맞음') + '</button></div>';
-    }
+    } else body = '<div class="opts"></div>';
     return omrGroupHead(items, idx) + '<div class="orow"><div class="orow-h"><b>' + it.no + '</b><small>' + h(it.work) + '</small></div><div class="stack" style="gap:4px">' + body + '</div></div>';
   }).join('');
   return '<div class="overlay se-ov" data-act="se-cancel"><div class="modal" role="dialog" aria-modal="true" aria-label="' + h(st.name) + ' 답 고치기" data-stop="1">' +
@@ -2307,7 +2301,7 @@ function tabWeek() {
   html += '<section class="block"><div class="block-h"><h2>문항별 오답률</h2><button class="link" data-act="toggle-items">' + (A.showAllItems ? '많이 틀린 15개만' : '전체 번호순으로') + '</button></div>' +
     '<div class="tscroll"><table class="t"><thead><tr><th>번호</th><th>작품</th><th>유형</th><th class="r">틀림</th>' + (anyBlank ? '<th class="r" title="고르지 않고 낸 학생 수. 오답률·선지 집계에서는 뺐어요">안 푼</th>' : '') + (anyOmr ? '<th title="틀린 선지인데 옳다고 고른 학생 수">잘못 고른 선지</th><th title="옳은 선지인데 고르지 않은 학생 수">놓친 정답</th>' : '<th class="r">찍맞</th>') + '<th>오답률</th></tr></thead><tbody>' +
     shown.map(function (p) {
-      return '<tr><td class="num">' + p.it.no + (p.it.essay ? ' <span class="tag">서술</span>' : '') + '</td><td>' + h(p.it.work) + '</td><td class="muted">' + p.it.types.map(function (t) { return h(TYPES[t] || t); }).join(', ') + '</td>' +
+      return '<tr><td class="num">' + p.it.no + '</td><td>' + h(p.it.work) + '</td><td class="muted">' + p.it.types.map(function (t) { return h(TYPES[t] || t); }).join(', ') + '</td>' +
         '<td class="r num">' + p.x + '</td>' + (anyBlank ? '<td class="r num muted">' + (p.bl || '') + '</td>' : '') + (anyOmr ? (p.wp ? ['wp', 'ms'].map(function (key) { return '<td class="muted">' + (p[key].length ? p[key].map(function (o) { return numc(o[0]) + ' ' + o[1] + '명'; }).join(' · ') : '–') + '</td>'; }).join('') : '<td class="muted" colspan="2">' + (p.it.essay ? '서술형' : '') + '</td>') : '<td class="r num">' + p.g + '</td>') + '<td class="cellbar"><i style="width:' + Math.max(2, p.r * 100) + '%"></i><span>' + pct(p.r) + '</span></td></tr>';
     }).join('') + '</tbody></table></div></section>';
 
@@ -3734,7 +3728,7 @@ function onClick(ev) {
   if (act === 'open-set' || act === 'focus-set') { openSet(id); return; }
   if (F && S.view === 'form') {
     keepMsg();
-    if ((act === 'opt' || act === 'ess') && F && F.sending) return;
+    if (act === 'opt' && F && F.sending) return;
     if (act === 'to-empty') {
       var e1 = F.items.filter(function (it) { return isOmr(it) && !(F.picks[it.no] || []).length; })[0];
       var el1 = e1 && document.getElementById('orow-' + e1.no);
@@ -3747,7 +3741,6 @@ function onClick(ev) {
       F.picks[no2] = arr2.sort(function (a, b) { return a - b; }); F.sure = false; F.blankAsk = false; F.armedAt = 0; saveDraft();
       return renderKeep();
     }
-    if (act === 'ess') { var no3 = t.dataset.no; if (F.marks[no3] === 'X') delete F.marks[no3]; else F.marks[no3] = 'X'; F.sure = false; saveDraft(); return renderKeep(); }
     if (act === 'mark') { var no = t.dataset.no, m = F.marks[no]; if (!m) F.marks[no] = 'X'; else if (m === 'X') F.marks[no] = 'G'; else { delete F.marks[no]; delete F.follow[no]; } return renderKeep(); }
   }
   // 선생님
@@ -3782,10 +3775,6 @@ function onClick(ev) {
     var no5 = Number(t.dataset.no), k5 = Number(t.dataset.k), arr5 = (A.subEdit.picks[no5] || []).slice(), at5 = arr5.indexOf(k5);
     if (at5 >= 0) arr5.splice(at5, 1); else arr5.push(k5);
     A.subEdit.picks[no5] = arr5.sort(function (a, b) { return a - b; });
-    return seRender();
-  }
-  if (act === 'se-ess' && A.subEdit) {
-    var no6 = t.dataset.no; if (A.subEdit.marks[no6] === 'X') delete A.subEdit.marks[no6]; else A.subEdit.marks[no6] = 'X';
     return seRender();
   }
   if (act === 'se-save' && A.subEdit) {
@@ -4036,7 +4025,6 @@ function onChange(ev) {
     if (t.dataset.edit === 'work') it.work = t.value.trim();
     if (t.dataset.edit === 'area') { it.area = t.value; it.types = it.types.filter(function (x) { return !it.area || areaOfType(x) === it.area; }); readEditHeader(); return renderKeep(); }
     if (t.dataset.edit === 'type') { var arr = [it.types[0] || '', it.types[1] || '']; arr[Number(t.dataset.slot)] = t.value; it.types = arr.filter(Boolean); if (!it.area && it.types[0]) { it.area = areaOfType(it.types[0]); readEditHeader(); return renderKeep(); } }
-    if (t.dataset.edit === 'essay') { it.essay = t.checked; readEditHeader(); return renderKeep(); }
     if (t.dataset.edit === 'opts') it.opts = Math.max(0, Math.min(20, Math.floor(Number(t.value) || 0)));
     if (t.dataset.edit === 'ans') it.ans = cleanPicks(t.value.replace(/[^\d,]+/g, ','), 20);
   }
